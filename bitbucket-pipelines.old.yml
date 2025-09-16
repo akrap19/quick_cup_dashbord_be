@@ -1,0 +1,69 @@
+image: google/cloud-sdk:slim
+
+clone:
+  depth: 1
+
+definitions:
+  steps:
+    - step: &build-image
+        name: Build Docker image
+        services:
+          - docker
+        caches:
+          - docker
+        script:
+          ### Workaround https://confluence.atlassian.com/bbkb/docker-buildkit-error-in-pipelines-1235859715.html
+          - export PATH=/usr/bin:$PATH
+          - export DOCKER_BUILDKIT=0
+          ### End workaround
+          - export BITBUCKET_COMMIT_SHORT_SHA=${BITBUCKET_COMMIT::7}
+          - export ARTIFACT_REGISTRY=$REGION-docker.pkg.dev
+          - export IMAGE_NAME=$PROJECT_NAME/$_SERVICE_NAME
+          - export IMAGE_TAG=$ARTIFACT_REGISTRY/$PROJECT_ID/$ARTIFACT_REPOSITORY/$IMAGE_NAME:$BITBUCKET_COMMIT
+          - apt update && apt install gettext-base -y
+          - echo "Build image "$IMAGE_TAG
+          - envsubst < .env.template > .env
+          - docker build --build-arg COMMIT_HASH=$BITBUCKET_COMMIT_SHORT_SHA --tag $IMAGE_TAG .
+          - echo "Authenticating with GCP"
+          - echo "$GCP_KEY_FILE" | base64 -d >> /tmp/key-file.json
+          - gcloud config set project $PROJECT_ID
+          - gcloud auth activate-service-account --key-file=/tmp/key-file.json
+          - gcloud auth configure-docker $ARTIFACT_REGISTRY
+          - docker push $IMAGE_TAG
+          - >-
+            gcloud run services update $_SERVICE_NAME
+            --concurrency=500
+            --image=$IMAGE_TAG
+            --max-instances=4
+            --min-instances=1
+            --platform=managed
+            --port=$ENV_PORT
+            --cpu-boost
+            --cpu-throttling
+            --execution-environment=gen1
+            --revision-suffix=$BITBUCKET_COMMIT_SHORT_SHA
+            --session-affinity
+            --set-cloudsql-instances=$_DB_NAME
+            --labels=managed-by=bitbucket-pipeline-cloud-run,commit-sha=$BITBUCKET_COMMIT,bitbucket-build-number=$BITBUCKET_BUILD_NUMBER
+            --region=$REGION
+            --quiet
+
+pipelines:
+  default:
+    - step:
+        <<: *build-image
+        deployment: test
+  branches:
+    develop:
+      - step:
+          <<: *build-image
+          deployment: develop
+    staging:
+      - step:
+          <<: *build-image
+          deployment: stage
+    master:
+      - step:
+          <<: *build-image
+          deployment: production
+          trigger: manual
