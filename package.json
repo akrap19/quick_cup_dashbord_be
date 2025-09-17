@@ -1,7 +1,7 @@
 {
   "name": "journeys_backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "build/server.js",
   "scripts": {
     "build": "tsc",
     "start": "node -r dotenv/config build/server.js",
