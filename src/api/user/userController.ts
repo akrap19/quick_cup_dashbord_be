@@ -6,27 +6,23 @@ import config from '../../config'
 import { UserSessionStatus } from '../user_session/interface'
 import { UserSessionService } from '../user_session/userSessionService'
 import { autoInjectable } from 'tsyringe'
-import { BarnahusService } from '../barnahus/barnahusService'
 
 @autoInjectable()
 export class UserController {
   private readonly userService: UserService
   private readonly userSessionService: UserSessionService
-  private readonly barnahusService: BarnahusService
 
   constructor(
     userService: UserService,
-    userSessionService: UserSessionService,
-    barnahusService: BarnahusService
+    userSessionService: UserSessionService
   ) {
     this.userService = userService
     this.userSessionService = userSessionService
-    this.barnahusService = barnahusService
   }
 
   getUserSettings = async (req: Request, res: Response, next: NextFunction) => {
     let code: ResponseCode = ResponseCode.OK
-    const { id: userId, barnahusId } = req.user
+    const { id: userId } = req.user
 
     const { user, code: userCode } = await this.userService.getUserById({
       userId
@@ -35,18 +31,12 @@ export class UserController {
       return next({ code: userCode })
     }
 
-    const { barnahus } = await this.barnahusService.getBarnahusById({
-      barnahusId: barnahusId
-    })
-
     const settings: IUserSettings = {
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
       newEmail: user.newEmail || null,
-      phoneNumber: user.phoneNumber || null,
-      locationCode: barnahus?.locationCode,
-      barnahusName: barnahus?.name
+      phoneNumber: user.phoneNumber || null
     }
 
     return next({ data: settings, code })
@@ -109,21 +99,21 @@ export class UserController {
     res: Response,
     next: NextFunction
   ) => {
-    const { uid, hashUid } = res.locals.input
+    // const { uid, hashUid } = res.locals.input
 
-    const { userId, code } = await this.userService.verifyUserEmail({
-      uid,
-      hashUid
-    })
-    if (!userId) {
-      return res.redirect(`${config.BASE_URL}/messages/error`)
-    }
+    // const { userId, code } = await this.userService.verifyUserEmail({
+    //   uid,
+    //   hashUid
+    // })
+    // if (!userId) {
+    //   return res.redirect(`${config.BASE_URL}/messages/error`)
+    // }
 
-    await this.userSessionService.expireUserSession({
-      userId,
-      status: UserSessionStatus.EXPIRED
-    })
+    // await this.userSessionService.expireUserSession({
+    //   userId,
+    //   status: UserSessionStatus.EXPIRED
+    // })
 
-    return res.redirect(`${config.BASE_URL}/messages/email-changed`)
+    return next({ code: ResponseCode.OK })
   }
 }

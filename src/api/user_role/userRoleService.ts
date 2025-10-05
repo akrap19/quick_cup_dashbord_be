@@ -132,8 +132,6 @@ export class UserRoleService implements IUserRoleService {
         .createQueryBuilder('userRole', queryRunner)
         .leftJoinAndSelect('userRole.user', 'user')
         .leftJoinAndSelect('userRole.role', 'role')
-        .leftJoinAndSelect('userRole.userRoleBarnahuses', 'userRoleBarnahus')
-        .leftJoinAndSelect('userRoleBarnahus.barnahus', 'barnahus')
         .andWhere('user.id = :userId', { userId })
         .getMany()
 

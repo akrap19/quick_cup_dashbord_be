@@ -11,7 +11,6 @@ import {
 } from 'typeorm'
 import { User } from '../user/userModel'
 import { Role } from '../role/roleModel'
-import { UserRoleBarnahus } from '../user_role_barnahus/userRoleBarnahusModel'
 
 @Entity()
 @Unique(['userId', 'roleId'])
@@ -39,13 +38,6 @@ export class UserRole {
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'assigned_by_id' })
   assignedBy!: User
-
-  @OneToMany(
-    () => UserRoleBarnahus,
-    (userRoleBarnahus) => userRoleBarnahus.userRole,
-    { eager: true }
-  )
-  userRoleBarnahuses!: UserRoleBarnahus[]
 
   @CreateDateColumn({
     type: 'timestamp',

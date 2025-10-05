@@ -2,37 +2,29 @@ import { NextFunction, Request, Response } from 'express'
 import { RoleType } from '../role/interface'
 import { IUsersLimited, IUsersPaginationLimited } from './interface'
 import { AdminService } from './adminService'
-import { UserRoleBarnahusService } from '../user_role_barnahus/userRoleBarnahusService'
 import { UserService } from '../user/userService'
 import { autoInjectable } from 'tsyringe'
 
 @autoInjectable()
 export class AdminController {
-  private readonly userRoleBarnahusService: UserRoleBarnahusService
   private readonly userService: UserService
   private readonly adminService: AdminService
 
-  constructor(
-    userRoleBarnahusService: UserRoleBarnahusService,
-    userService: UserService,
-    adminService: AdminService
-  ) {
-    this.userRoleBarnahusService = userRoleBarnahusService
+  constructor(userService: UserService, adminService: AdminService) {
     this.userService = userService
     this.adminService = adminService
   }
 
   addAdmin = async (req: Request, res: Response, next: NextFunction) => {
     const { email, firstName, lastName, phoneNumber } = res.locals.input
-    const { id, barnahusId } = req.user
+    const { id } = req.user
 
     const { code: adminCode } = await this.adminService.createAdmin({
       firstName,
       lastName,
       email,
       phoneNumber,
-      assignedById: id,
-      barnahusId
+      assignedById: id
     })
 
     return next({ code: adminCode })
@@ -40,31 +32,21 @@ export class AdminController {
 
   getAdmins = async (req: Request, res: Response, next: NextFunction) => {
     const { search, page, limit } = res.locals.input
-    const { barnahusId } = req.user
 
     const { userData, code } = await this.userService.getUsers({
       search,
       page,
       limit,
-      role: RoleType.ADMIN,
-      barnahusId
+      role: RoleType.ADMIN
     })
 
     if (userData) {
       const usersLimited: IUsersLimited[] = userData.users.map((user) => {
-        let barnahusAdmin = user
-          .userRoles!.find((userRole) => userRole.role.name == RoleType.ADMIN)!
-          .userRoleBarnahuses!.find(
-            (userRoleBarnahus) => userRoleBarnahus.barnahusId == barnahusId
-          )
-        const location = barnahusAdmin!.barnahus.location
-        const locationCode = barnahusAdmin!.barnahus.locationCode
-
         return {
           userId: user.id,
           name: user.firstName + ' ' + user.lastName,
-          location,
-          locationCode
+          email: user.email,
+          phoneNumber: user.phoneNumber
         }
       })
 
@@ -81,47 +63,45 @@ export class AdminController {
 
   getAdmin = async (req: Request, res: Response, next: NextFunction) => {
     const { userId } = res.locals.input
-    const { barnahusId } = req.user
 
     const { user, code } = await this.userService.getUserById({
       userId,
       allUsers: true,
-      role: RoleType.ADMIN,
-      barnahusId
+      role: RoleType.ADMIN
     })
     if (!user) {
       return next({ code })
     }
-
-    let barnahusAdmin = user
-      .userRoles!.find((userRole) => userRole.role.name == RoleType.ADMIN)!
-      .userRoleBarnahuses!.find(
-        (userRoleBarnahus) => userRoleBarnahus.barnahusId == barnahusId
-      )
-    const location = barnahusAdmin!.barnahus.location
-    const locationCode = barnahusAdmin!.barnahus.locationCode
 
     let admin = {
       userId: user.id,
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
-      phoneNumber: user.phoneNumber,
-      location,
-      locationCode
+      phoneNumber: user.phoneNumber
     }
 
     return next({ data: { admin }, code })
   }
 
+  editAdmin = async (req: Request, res: Response, next: NextFunction) => {
+    const { userId, firstName, lastName, phoneNumber } = res.locals.input
+
+    const { code } = await this.adminService.editAdmin({
+      userId,
+      firstName,
+      lastName,
+      phoneNumber
+    })
+
+    return next({ code })
+  }
+
   deleteAdmin = async (req: Request, res: Response, next: NextFunction) => {
     const { userId } = res.locals.input
-    const { barnahusId } = req.user
 
-    const { code } = await this.userRoleBarnahusService.deleteUserRoleBarnahus({
-      userId,
-      role: RoleType.ADMIN,
-      barnahusId
+    const { code } = await this.adminService.deleteAdmin({
+      userId
     })
 
     return next({ code })
@@ -133,28 +113,9 @@ export class AdminController {
     next: NextFunction
   ) => {
     const { userIds } = res.locals.input
-    const { barnahusId } = req.user
 
-    const { code } =
-      await this.userRoleBarnahusService.bulkDeleteUserRoleBarnahuses({
-        role: RoleType.ADMIN,
-        userIds,
-        barnahusId
-      })
-
-    return next({ code })
-  }
-
-  editAdmin = async (req: Request, res: Response, next: NextFunction) => {
-    const { userId, firstName, lastName, phoneNumber } = res.locals.input
-    const { barnahusId } = req.user
-
-    const { code } = await this.adminService.editAdmin({
-      barnahusId,
-      userId,
-      firstName,
-      lastName,
-      phoneNumber
+    const { code } = await this.adminService.bulkDeleteAdmins({
+      userIds
     })
 
     return next({ code })

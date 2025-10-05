@@ -5,9 +5,7 @@ import {
   loginUserSchema,
   resetPasswordSchema,
   verifyGetEmailSchema,
-  verifyUserSchema,
-  mobileLoginUserSchema,
-  caseLoginSchema
+  verifyUserSchema
 } from './authInput'
 import { requireToken } from '../../middleware/auth'
 import { validate } from '../../middleware/validation'
@@ -28,12 +26,6 @@ authRouter.post(
   loginRateLimiter,
   authController.login
 )
-authRouter.post(
-  '/mobile-login',
-  validate(mobileLoginUserSchema),
-  loginRateLimiter,
-  authController.mobileLogin
-)
 authRouter.post('/refresh', authController.refreshToken)
 authRouter.post('/logout', requireToken, authController.logout)
 authRouter.get(
@@ -50,9 +42,4 @@ authRouter.post(
   '/password/reset',
   validate(resetPasswordSchema),
   authController.resetPassword
-)
-authRouter.post(
-  '/case/login',
-  validate(caseLoginSchema),
-  authController.caseLogin
 )

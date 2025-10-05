@@ -6,8 +6,6 @@ export interface IAssignRole extends IServiceMethod {
   userId: string
   roleName: RoleType
   assignedById: string
-  userProfession?: string
-  barnahusId?: string
 }
 
 export interface ICreateUserRole {
@@ -37,40 +35,11 @@ export interface IGetUserRole extends IServiceMethod {
 
 export interface IEditUserRole extends IServiceMethod {
   userRoleId: string
-  userRoleBarnahusId: string
-}
-
-export interface IGetUserRoleBarnahusesByUserRole {
-  role: RoleType
-  barnahusId: string
-}
-
-export interface IGetUserRoleBarnahusesByUserId {
-  userId: string
-  barnahusId: string
-}
-
-export interface IAssignUserRoleBarnahus extends IServiceMethod {
-  userId: string
-  role: RoleType
-  barnahusId: string
 }
 
 export interface IDeleteUserRole extends IServiceMethod {
   userId: string
   role: RoleType
-}
-
-export interface IGetUserRoleBarnahus {
-  userId: string
-  role: RoleType
-  barnahusId: string
-}
-
-export interface IDeleteUserRoleBarnahus extends IServiceMethod {
-  userId: string
-  role: RoleType
-  barnahusId: string
 }
 
 export interface IBulkDeleteUserRoles {

@@ -6,8 +6,7 @@ import {
   deleteMasterAdminSchema,
   bulkDeleteMasterAdminSchema,
   editMasterAdminSchema,
-  getMasterAdminSchema,
-  getAssignableMasterAdminsSchema
+  getMasterAdminSchema
 } from './masterAdminInput'
 import { requireRole, requireToken } from '../../middleware/auth'
 import { RoleType } from '../role/interface'
@@ -20,7 +19,7 @@ export const masterAdminRouter = express.Router()
 masterAdminRouter.post(
   '/',
   requireToken,
-  requireRole([RoleType.SUPER_ADMIN]),
+  requireRole([RoleType.MASTER_ADMIN]),
   validate(addMasterAdminSchema),
   masterAdminController.addMasterAdmin
 )
@@ -28,23 +27,15 @@ masterAdminRouter.post(
 masterAdminRouter.get(
   '/',
   requireToken,
-  requireRole([RoleType.SUPER_ADMIN]),
+  requireRole([RoleType.MASTER_ADMIN]),
   validate(getMasterAdminsSchema),
   masterAdminController.getMasterAdmins
 )
 
 masterAdminRouter.get(
-  '/assignable',
-  requireToken,
-  requireRole([RoleType.SUPER_ADMIN]),
-  validate(getAssignableMasterAdminsSchema),
-  masterAdminController.getAssignableMasterAdmins
-)
-
-masterAdminRouter.get(
   '/:id',
   requireToken,
-  requireRole([RoleType.SUPER_ADMIN]),
+  requireRole([RoleType.MASTER_ADMIN]),
   validate(getMasterAdminSchema),
   masterAdminController.getMasterAdmin
 )
@@ -52,7 +43,7 @@ masterAdminRouter.get(
 masterAdminRouter.delete(
   '/',
   requireToken,
-  requireRole([RoleType.SUPER_ADMIN]),
+  requireRole([RoleType.MASTER_ADMIN]),
   validate(deleteMasterAdminSchema),
   masterAdminController.deleteMasterAdmin
 )
@@ -60,7 +51,7 @@ masterAdminRouter.delete(
 masterAdminRouter.delete(
   '/bulk',
   requireToken,
-  requireRole([RoleType.SUPER_ADMIN]),
+  requireRole([RoleType.MASTER_ADMIN]),
   validate(bulkDeleteMasterAdminSchema),
   masterAdminController.bulkDeleteMasterAdmins
 )
@@ -68,7 +59,7 @@ masterAdminRouter.delete(
 masterAdminRouter.put(
   '/',
   requireToken,
-  requireRole([RoleType.SUPER_ADMIN]),
+  requireRole([RoleType.MASTER_ADMIN]),
   validate(editMasterAdminSchema),
   masterAdminController.editMasterAdmin
 )

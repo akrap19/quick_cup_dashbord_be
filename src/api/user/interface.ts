@@ -9,7 +9,6 @@ export type AuthUser = {
   loginType: LoginType
   roles: UserRole[]
   authenticatedRoles: UserRole[]
-  barnahusId: string
 }
 
 export interface IUsersPagination {
@@ -38,7 +37,6 @@ export interface IGetUserById extends IServiceMethod {
   userId: string
   allUsers?: boolean
   role?: RoleType
-  barnahusId?: string
 }
 
 export interface IGetUserByEmail extends IServiceMethod {
@@ -87,8 +85,6 @@ export interface IUserSettings {
   email: string
   newEmail: string | null
   phoneNumber: string | null
-  locationCode?: string
-  barnahusName?: string
 }
 
 export interface IVerifyUserEmail {
@@ -102,8 +98,6 @@ export interface IGetUsers {
   limit: number
   role?: RoleType
   location?: string | null
-  barnahusId?: string,
-  hasBarnahus?: boolean
 }
 
 export interface IUserService {

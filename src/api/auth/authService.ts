@@ -9,12 +9,10 @@ import {
   IResetPassword,
   ISendForgotPasswordEmail,
   ISignToken,
+  IStoreUserSession,
   IUserRole,
-  IUserRoleBarnahus,
   IVerifyUser,
   ICheckUserSpecificRole,
-  IAuthenticateCasePassword,
-  IChangeCasePassword,
   IGetApiKey
 } from './interface'
 import { VerificationUIDService } from '../verification_uid/verificationUIDService'
@@ -32,10 +30,9 @@ import { UserSessionService } from '../user_session/userSessionService'
 import { LoginType, UserSessionStatus } from '../user_session/interface'
 import { UserRoleService } from '../user_role/userRoleService'
 import { autoInjectable } from 'tsyringe'
-import { EmailTemplateService } from '../email_template/emailTemplateService'
-import { EmailTemplates } from '../email_template/interface'
-import { CaseService } from '../case/caseService'
+import { EmailTemplates } from '../../services/email/templates'
 import { UserStatus } from '../user/interface'
+import { emailService } from '../../services/email'
 import { Repository } from 'typeorm'
 import { ApiKey } from './apiKeyModel'
 import { AppDataSource } from '../../services/typeorm'
@@ -47,24 +44,18 @@ export class AuthService implements IAuthService {
   private readonly verificationUIDService: VerificationUIDService
   private readonly userSessionService: UserSessionService
   private readonly userRoleService: UserRoleService
-  private readonly emailTemplateService: EmailTemplateService
-  private readonly caseService: CaseService
 
   constructor(
     userService: UserService,
     verificationUIDService: VerificationUIDService,
     userSessionService: UserSessionService,
-    userRoleService: UserRoleService,
-    emailTemplateService: EmailTemplateService,
-    caseService: CaseService
+    userRoleService: UserRoleService
   ) {
     this.apiKeyRepository = AppDataSource.manager.getRepository(ApiKey)
     this.userService = userService
     this.verificationUIDService = verificationUIDService
     this.userSessionService = userSessionService
     this.userRoleService = userRoleService
-    this.emailTemplateService = emailTemplateService
-    this.caseService = caseService
   }
 
   verifyUser = async ({ uid, hashUid, password }: IVerifyUser) => {
@@ -142,40 +133,6 @@ export class AuthService implements IAuthService {
     return { code }
   }
 
-  authenticateCasePassword = async ({
-    customId,
-    password
-  }: IAuthenticateCasePassword) => {
-    let code: ResponseCode = ResponseCode.OK
-
-    try {
-      const { case: userCase, code: caseCode } =
-        await this.caseService.getCaseByCustomId({
-          customId
-        })
-
-      if (!userCase) {
-        return { code: caseCode }
-      }
-
-      const matches = await compare(password, userCase.password)
-      if (!matches) {
-        return { code: ResponseCode.WRONG_PASSWORD }
-      }
-
-      return { case: userCase, code }
-    } catch (err: any) {
-      code = ResponseCode.SERVER_ERROR
-      logger.error({
-        code,
-        message: getResponseMessage(code),
-        stack: err.stack
-      })
-    }
-
-    return { code }
-  }
-
   signToken = async ({
     sub,
     loginType,
@@ -205,22 +162,12 @@ export class AuthService implements IAuthService {
         }
       )
 
-      let session
-      if (loginType != LoginType.CASE) {
-        const { userSession, code: userSessionCode } =
-          await this.userSessionService.storeUserSession({
-            loginType: loginType,
-            userId: sub,
-            refreshToken
-          })
-        if (!userSession) {
-          return { code: userSessionCode }
-        }
-        session = userSession
-      }
-
       const expiresAt = new Date(
         Date.now() + Number(config.ACCESS_TOKEN_EXPIRES_IN) * 60 * 1000
+      )
+
+      const refreshTokenExpiresAt = new Date(
+        Date.now() + Number(config.REFRESH_TOKEN_EXPIRES_IN) * 60 * 1000
       )
 
       return {
@@ -228,10 +175,38 @@ export class AuthService implements IAuthService {
           accessToken,
           refreshToken,
           accessTokenExpiresAt: expiresAt,
-          refreshTokenExpiresAt: session ? session.expiresAt : null
+          refreshTokenExpiresAt: refreshTokenExpiresAt
         },
         code
       }
+    } catch (err: any) {
+      code = ResponseCode.SERVER_ERROR
+      logger.error({
+        code,
+        message: getResponseMessage(code),
+        stack: err.stack
+      })
+    }
+
+    return { code }
+  }
+
+  storeUserSession = async ({
+    userId,
+    refreshToken,
+    loginType
+  }: IStoreUserSession) => {
+    let code: ResponseCode = ResponseCode.OK
+
+    try {
+      const { code: userSessionCode } =
+        await this.userSessionService.storeUserSession({
+          userId,
+          refreshToken,
+          loginType
+        })
+
+      return { code: userSessionCode }
     } catch (err: any) {
       code = ResponseCode.SERVER_ERROR
       logger.error({
@@ -358,53 +333,16 @@ export class AuthService implements IAuthService {
       }
 
       let roles: IUserRole[] = []
-      let barnahusRoles: IUserRoleBarnahus[] = []
       for (let userRole of userRoles) {
-        let barnahuses = []
-
         let role = {
           userRoleId: userRole.id,
           name: userRole.role.name
         }
 
-        if (
-          userRole.userRoleBarnahuses &&
-          userRole.userRoleBarnahuses.length > 0
-        ) {
-          for (let userRoleBarnahus of userRole.userRoleBarnahuses) {
-            barnahuses.push({
-              barnahusId: userRoleBarnahus.barnahus.id,
-              name: userRoleBarnahus.barnahus.name,
-              location: userRoleBarnahus.barnahus.location
-            })
-
-            let existingBarnahusIndex = barnahusRoles.findIndex(
-              (barnahusRole) =>
-                barnahusRole.barnahusId == userRoleBarnahus.barnahusId
-            )
-            if (existingBarnahusIndex > -1) {
-              barnahusRoles[existingBarnahusIndex].userRoles = [
-                ...barnahusRoles[existingBarnahusIndex].userRoles,
-                role
-              ]
-            } else {
-              barnahusRoles.push({
-                barnahusId: userRoleBarnahus.barnahus.id,
-                name: userRoleBarnahus.barnahus.name,
-                location: userRoleBarnahus.barnahus.location,
-                userRoles: [role]
-              })
-            }
-          }
-        }
-
-        roles.push({
-          ...role,
-          barnahuses
-        })
+        roles.push(role)
       }
 
-      return { userRoleData: { userRoles: roles, barnahusRoles }, code }
+      return { userRoleData: { userRoles: roles }, code }
     } catch (err: any) {
       code = ResponseCode.SERVER_ERROR
       logger.error({
@@ -468,11 +406,11 @@ export class AuthService implements IAuthService {
         return { code: uidCode }
       }
 
-      await this.emailTemplateService.sendEmail({
+      await emailService.sendEmail({
         to: user.email,
         template: EmailTemplates.FORGOT_PASSWORD,
         data: {
-          URL: `${config.BASE_URL}/reset-password?uid=${uids.uid}/${uids.hashUID}`
+          URL: `${config.CLIENT_BASE_URL}/reset-password?uid=${uids.uid}/${uids.hashUID}`
         }
       })
 

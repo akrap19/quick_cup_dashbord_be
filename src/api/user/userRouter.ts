@@ -9,7 +9,6 @@ import {
   validateEmailSchema
 } from './userInput'
 import { container } from 'tsyringe'
-import { requireBarnahus } from '../../middleware/barnahus'
 import { RoleType } from '../role/interface'
 
 const userController = container.resolve(UserController)
@@ -19,12 +18,11 @@ userRouter.get(
   '/settings',
   requireToken,
   requireRole([
-    RoleType.SUPER_ADMIN,
     RoleType.MASTER_ADMIN,
     RoleType.ADMIN,
-    RoleType.PRACTITIONER
+    RoleType.SERVICE,
+    RoleType.CLIENT
   ]),
-  requireBarnahus,
   userController.getUserSettings
 )
 
@@ -50,7 +48,7 @@ userRouter.put(
 )
 
 userRouter.get(
-  '/validateEmail/:uid/:hashUid',
+  '/validateEmail',
   validate(validateEmailSchema),
   userController.validateUserEmail
 )

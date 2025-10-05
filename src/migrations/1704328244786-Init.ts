@@ -1,6 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm'
 import { RoleType } from '../api/role/interface'
-import { UserStatus } from '../api/user/interface'
 
 export class Init1704328244786 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {

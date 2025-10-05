@@ -1,7 +1,6 @@
 import { NextFunction, Request, Response } from 'express'
 import { UserRoleService } from '../user_role/userRoleService'
 import { RoleType } from '../role/interface'
-import { IUsersLimited, IUsersPaginationLimited } from '../admin/interface'
 import {
   IMasterAdminsLimited,
   IMasterAdminsPaginationLimited
@@ -27,8 +26,7 @@ export class MasterAdminController {
   }
 
   addMasterAdmin = async (req: Request, res: Response, next: NextFunction) => {
-    const { email, firstName, lastName, phoneNumber, barnahusId } =
-      res.locals.input
+    const { email, firstName, lastName, phoneNumber } = res.locals.input
     const { id: authenticatedUserId } = req.user
 
     const { code } = await this.masterAdminService.createMasterAdmin({
@@ -36,8 +34,7 @@ export class MasterAdminController {
       lastName,
       email,
       phoneNumber,
-      assignedById: authenticatedUserId,
-      barnahusId
+      assignedById: authenticatedUserId
     })
 
     return next({ code })
@@ -59,23 +56,10 @@ export class MasterAdminController {
     }
 
     const usersLimited: IMasterAdminsLimited[] = userData.users.map((user) => {
-      let locations: string[] = []
-
-      for (let userRole of user.userRoles) {
-        if (userRole.role.name == RoleType.MASTER_ADMIN) {
-          for (let userRoleBarnahus of userRole.userRoleBarnahuses) {
-            locations.push(
-              `${userRoleBarnahus.barnahus.name} (${userRoleBarnahus.barnahus.locationCode})`
-            )
-          }
-        }
-      }
-
       return {
         userId: user.id,
         name: `${user.firstName} ${user.lastName}`,
-        locations,
-        deletable: locations.length == 0
+        phoneNumber: user.phoneNumber ?? null
       }
     })
 
@@ -99,25 +83,12 @@ export class MasterAdminController {
       return next({ code })
     }
 
-    let locations: string[] = []
-
-    for (let userRole of user.userRoles) {
-      if (userRole.role.name == RoleType.MASTER_ADMIN) {
-        for (let userRoleBarnahus of userRole.userRoleBarnahuses) {
-          locations.push(
-            `${userRoleBarnahus.barnahus.name} (${userRoleBarnahus.barnahus.locationCode})`
-          )
-        }
-      }
-    }
-
     let masterAdmin = {
       userId: user.id,
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
-      phoneNumber: user.phoneNumber,
-      locations
+      phoneNumber: user.phoneNumber
     }
 
     return next({ data: { masterAdmin }, code })
@@ -164,39 +135,5 @@ export class MasterAdminController {
     })
 
     return next({ code })
-  }
-
-  getAssignableMasterAdmins = async (
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ) => {
-    const { search, page, limit } = res.locals.input
-
-    const { userData, code } = await this.userService.getUsers({
-      search,
-      page,
-      limit,
-      role: RoleType.MASTER_ADMIN
-    })
-
-    if (!userData) {
-      return next({ code })
-    }
-
-    const usersLimited: IUsersLimited[] = userData.users.map((masterAdmin) => {
-      return {
-        userId: masterAdmin.id,
-        name: `${masterAdmin.firstName} ${masterAdmin.lastName}`,
-        location: null
-      }
-    })
-
-    let adminsData: IUsersPaginationLimited = {
-      pagination: userData.pagination,
-      users: usersLimited
-    }
-
-    return next({ data: adminsData, code })
   }
 }

@@ -12,34 +12,26 @@ import {
 } from './interface'
 import { User } from '../user/userModel'
 import { autoInjectable } from 'tsyringe'
-import { UserRoleBarnahusService } from '../user_role_barnahus/userRoleBarnahusService'
 import { UserStatus } from '../user/interface'
 import { VerificationUIDType } from '../verification_uid/interface'
-import { EmailTemplates } from '../email_template/interface'
+import { EmailTemplates } from '../../services/email/templates'
 import config from '../../config'
 import { VerificationUIDService } from '../verification_uid/verificationUIDService'
-import { EmailTemplateService } from '../email_template/emailTemplateService'
 
 @autoInjectable()
 export class MasterAdminService implements IMasterAdminService {
   private readonly userService: UserService
   private readonly userRoleService: UserRoleService
-  private readonly userRoleBarnahusService: UserRoleBarnahusService
   private readonly verificationUIDService: VerificationUIDService
-  private readonly emailTemplateService: EmailTemplateService
 
   constructor(
     userService: UserService,
     userRoleService: UserRoleService,
-    userRoleBarnahusService: UserRoleBarnahusService,
-    verificationUIDService: VerificationUIDService,
-    emailTemplateService: EmailTemplateService
+    verificationUIDService: VerificationUIDService
   ) {
     this.userService = userService
     this.userRoleService = userRoleService
-    this.userRoleBarnahusService = userRoleBarnahusService
-    ;(this.verificationUIDService = verificationUIDService),
-      (this.emailTemplateService = emailTemplateService)
+    this.verificationUIDService = verificationUIDService
   }
 
   createMasterAdmin = async ({
@@ -47,8 +39,7 @@ export class MasterAdminService implements IMasterAdminService {
     lastName,
     email,
     phoneNumber,
-    assignedById,
-    barnahusId
+    assignedById
   }: ICreateMasterAdmin) => {
     let code: ResponseCode = ResponseCode.OK
     const queryRunner = AppDataSource.createQueryRunner()
@@ -95,55 +86,6 @@ export class MasterAdminService implements IMasterAdminService {
         await queryRunner.rollbackTransaction()
         await queryRunner.release()
         return { code: assignRoleCode }
-      }
-
-      if (barnahusId) {
-        const { userRoleBarnahus: existingMasterAdmin } =
-          await this.userRoleBarnahusService.getUserRoleBarnahus({
-            userId: user.id,
-            role: RoleType.MASTER_ADMIN,
-            barnahusId
-          })
-        if (existingMasterAdmin) {
-          return { code: ResponseCode.BARNAHUS_HAS_MASTER_ADMIN }
-        }
-
-        const { userRole, code: userRoleBarnahusCode } =
-          await this.userRoleBarnahusService.assignUserRoleToBarnahus({
-            userId: user.id,
-            role: RoleType.MASTER_ADMIN,
-            barnahusId,
-            assignedById,
-            queryRunner
-          })
-
-        if (!userRole) {
-          await queryRunner.rollbackTransaction()
-          await queryRunner.release()
-          return { code: userRoleBarnahusCode }
-        }
-
-        //Send delayed verification email if user has not yet been verified
-        if (userRole.user.status == UserStatus.CREATED) {
-          const { uids, code: uidCode } =
-            await this.verificationUIDService.setVerificationUID({
-              userId: userRole.userId,
-              type: VerificationUIDType.REGISTRATION,
-              queryRunner
-            })
-          if (!uids) {
-            return { code: uidCode }
-          }
-
-          await this.emailTemplateService.sendEmail({
-            to: userRole.user.email,
-            template: EmailTemplates.INVITATION,
-            data: {
-              URL: `${config.BASE_URL}/register?uid=${uids.uid}/${uids.hashUID}`,
-              ROLE: RoleName.MASTER_ADMIN
-            }
-          })
-        }
       }
 
       await queryRunner.commitTransaction()

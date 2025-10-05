@@ -4,8 +4,7 @@ import { User } from '../user/userModel'
 export interface IMasterAdminsLimited {
   userId: string
   name: string
-  locations: string[] | null
-  deletable: boolean
+  phoneNumber?: string | null
 }
 
 export interface IMasterAdminsPaginationLimited {
@@ -45,7 +44,6 @@ export interface ICreateMasterAdmin {
   email: string
   phoneNumber?: string
   assignedById: string
-  barnahusId?: string
 }
 
 export interface IMasterAdminService {

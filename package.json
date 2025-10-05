@@ -1,7 +1,7 @@
 {
   "name": "journeys_backend",
   "version": "1.0.0",
-  "main": "build/server.js",
+  "main": "index.js",
   "scripts": {
     "build": "tsc",
     "start": "node -r dotenv/config build/server.js",
@@ -26,6 +26,7 @@
     "@types/lodash": "^4.14.202",
     "@types/morgan": "^1.9.9",
     "@types/node": "^20.10.7",
+    "@types/nodemailer": "^6.4.14",
     "@types/swagger-ui-express": "^4.1.6",
     "@types/uuid": "^9.0.7",
     "bcryptjs": "^2.4.3",
@@ -40,6 +41,7 @@
     "lodash": "^4.17.21",
     "morgan": "^1.10.0",
     "mysql2": "^3.6.5",
+    "nodemailer": "^7.0.6",
     "rate-limiter-flexible": "^3.0.4",
     "reflect-metadata": "^0.2.1",
     "string-similarity-js": "^2.1.4",

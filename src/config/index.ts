@@ -2,6 +2,7 @@ interface ENV {
   PORT?: number
   BASE_URL?: string
   API_BASE_URL?: string
+  CLIENT_BASE_URL?: string
   NODE_ENV?: string
   RATE_LIMITER_POINTS?: number
   RATE_LIMITER_DURATION_IN_SECONDS?: number
@@ -32,6 +33,12 @@ interface ENV {
   SUPER_ADMIN_PASSWORD?: string
   SENDGRID_API_KEY?: string
   SENDER_EMAIL_ADDRESS?: string
+  SMTP_HOST?: string
+  SMTP_PORT?: number
+  SMTP_USER?: string
+  SMTP_PASS?: string
+  SMTP_SECURE?: boolean
+  SMTP_TLS_REJECT_UNAUTHORIZED?: boolean
   GOOGLE_PLACES_API_KEY?: string
   GOOGLE_TRANSLATE_API_KEY?: string
   GOOGLE_SERVICE_ACCOUNT_KEY_LOCATION?: string
@@ -58,9 +65,10 @@ const environmentBoolean = (envBool: any): boolean | undefined => {
 
 const getConfig = (): ENV => {
   return {
-    PORT: environmentNumber(process.env.PORT),
+    PORT: environmentNumber(process.env.PORT) || 4000,
     BASE_URL: process.env.BASE_URL,
     API_BASE_URL: process.env.API_BASE_URL,
+    CLIENT_BASE_URL: process.env.CLIENT_BASE_URL,
     NODE_ENV: process.env.NODE_ENV,
     RATE_LIMITER_POINTS: environmentNumber(process.env.RATE_LIMITER_POINTS),
     RATE_LIMITER_DURATION_IN_SECONDS: environmentNumber(
@@ -103,6 +111,14 @@ const getConfig = (): ENV => {
     SUPER_ADMIN_PASSWORD: process.env.SUPER_ADMIN_PASSWORD,
     SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
     SENDER_EMAIL_ADDRESS: process.env.SENDER_EMAIL_ADDRESS,
+    SMTP_HOST: process.env.SMTP_HOST,
+    SMTP_PORT: environmentNumber(process.env.SMTP_PORT),
+    SMTP_USER: process.env.SMTP_USER,
+    SMTP_PASS: process.env.SMTP_PASS,
+    SMTP_SECURE: environmentBoolean(process.env.SMTP_SECURE),
+    SMTP_TLS_REJECT_UNAUTHORIZED: environmentBoolean(
+      process.env.SMTP_TLS_REJECT_UNAUTHORIZED
+    ),
     GOOGLE_PLACES_API_KEY: process.env.GOOGLE_PLACES_API_KEY,
     GOOGLE_TRANSLATE_API_KEY: process.env.GOOGLE_TRANSLATE_API_KEY,
     GOOGLE_SERVICE_ACCOUNT_KEY_LOCATION:

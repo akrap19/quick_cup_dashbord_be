@@ -28,7 +28,11 @@ export class UserSessionService implements IUserSessionService {
     this.userService = userService
   }
 
-  storeUserSession = async ({ userId, refreshToken, loginType }: IStoreUserSession) => {
+  storeUserSession = async ({
+    userId,
+    refreshToken,
+    loginType
+  }: IStoreUserSession) => {
     let code: ResponseCode = ResponseCode.OK
 
     try {
@@ -52,7 +56,12 @@ export class UserSessionService implements IUserSessionService {
       )
 
       const refreshTokenHash = await hashString(refreshToken)
-      const userSession = new UserSession(userId, refreshTokenHash, expiresAt, loginType)
+      const userSession = new UserSession(
+        userId,
+        refreshTokenHash,
+        expiresAt,
+        loginType
+      )
       await this.userSessionRepository.save(userSession)
 
       return { userSession, code }
@@ -83,11 +92,11 @@ export class UserSessionService implements IUserSessionService {
         where: { userId, status: UserSessionStatus.ACTIVE }
       })
 
-      if (!userSessions.length ) {
+      if (!userSessions.length) {
         return { code: ResponseCode.USER_SESSION_NOT_FOUND }
       }
 
-      const loginTypes = userSessions.map(session => {
+      const loginTypes = userSessions.map((session) => {
         return session.loginType
       })
 
@@ -119,11 +128,11 @@ export class UserSessionService implements IUserSessionService {
         where: { userId }
       })
 
-      if (!userSessions.length ) {
+      if (!userSessions.length) {
         return { code: ResponseCode.USER_SESSION_NOT_FOUND }
       }
 
-      const loginTypes = userSessions.map(session => {
+      const loginTypes = userSessions.map((session) => {
         return session.loginType
       })
 
@@ -200,6 +209,7 @@ export class UserSessionService implements IUserSessionService {
       const userSession = await this.userSessionRepository.findOne({
         where: { userId, status: UserSessionStatus.ACTIVE }
       })
+
       if (!userSession) {
         return { code: ResponseCode.USER_SESSION_NOT_FOUND }
       }

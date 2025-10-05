@@ -7,25 +7,21 @@ import { VerificationUIDService } from '../verification_uid/verificationUIDServi
 import { autoInjectable } from 'tsyringe'
 import { RoleType } from '../role/interface'
 import { LoginType } from '../user_session/interface'
-import { BarnahusService } from '../barnahus/barnahusService'
 
 @autoInjectable()
 export class AuthController {
   private readonly authService: AuthService
   private readonly userService: UserService
   private readonly verificationUIDService: VerificationUIDService
-  private readonly barnahusService: BarnahusService
 
   constructor(
     authService: AuthService,
     userService: UserService,
-    verificationUIDService: VerificationUIDService,
-    barnahusService: BarnahusService
+    verificationUIDService: VerificationUIDService
   ) {
     this.authService = authService
     this.userService = userService
     this.verificationUIDService = verificationUIDService
-    this.barnahusService = barnahusService
   }
 
   verifyUser = async (req: Request, res: Response, next: NextFunction) => {
@@ -69,12 +65,21 @@ export class AuthController {
       return next({ code: tokenCode })
     }
 
+    // Store user session in database
+    const { code: sessionCode } = await this.authService.storeUserSession({
+      userId: user.id,
+      refreshToken: tokens.refreshToken,
+      loginType: LoginType.WEB
+    })
+    if (sessionCode !== ResponseCode.OK) {
+      return next({ code: sessionCode })
+    }
+
     return next({
       data: {
         user: {
           ...responseUser,
-          roles: userRoleData.userRoles,
-          barnahusRoles: userRoleData.barnahusRoles
+          roles: userRoleData.userRoles
         },
         ...tokens
       },
@@ -89,6 +94,7 @@ export class AuthController {
       email,
       password
     })
+
     if (!user) {
       return next({ code })
     }
@@ -117,99 +123,23 @@ export class AuthController {
       return next({ code: tokenCode })
     }
 
+    // Store user session in database
+    const { code: sessionCode } = await this.authService.storeUserSession({
+      userId: user.id,
+      refreshToken: tokens.refreshToken,
+      loginType: LoginType.WEB
+    })
+    if (sessionCode !== ResponseCode.OK) {
+      return next({ code: sessionCode })
+    }
+
     return next({
       data: {
         user: {
           ...responseUser,
-          roles: userRoleData.userRoles,
-          barnahusRoles: userRoleData.barnahusRoles
+          roles: userRoleData.userRoles
         },
         ...tokens
-      },
-      code: ResponseCode.OK
-    })
-  }
-
-  mobileLogin = async (req: Request, res: Response, next: NextFunction) => {
-    const { email, password, locationCode } = res.locals.input
-
-    const { user, code } = await this.authService.authenticatePassword({
-      email,
-      password
-    })
-    if (!user) {
-      return next({ code })
-    }
-
-    const { userRoles, code: userRoleCode } =
-      await this.authService.checkIfSpecificRole({
-        userId: user.id,
-        roles: [RoleType.PRACTITIONER]
-      })
-
-    if (!userRoles) {
-      return next({ code: userRoleCode })
-    }
-
-    let barnahusId = undefined
-    if (locationCode) {
-      const { barnahus, code: barnahusCode } =
-        await this.barnahusService.getBarnahusByLocationCode({
-          locationCode
-        })
-
-      if (!barnahus) {
-        return next({ code: barnahusCode })
-      }
-
-      barnahusId = barnahus.id
-    }
-
-    const { tokens, code: tokenCode } = await this.authService.signToken({
-      sub: user.id,
-      loginType: LoginType.MOBILE
-    })
-
-    if (!tokens) {
-      return next({ code: tokenCode })
-    }
-
-    return next({
-      data: {
-        ...tokens,
-        ...(locationCode && { barnahusId })
-      },
-      code: ResponseCode.OK
-    })
-  }
-
-  caseLogin = async (req: Request, res: Response, next: NextFunction) => {
-    const { customId, password } = res.locals.input
-
-    const { case: userCase, code } =
-      await this.authService.authenticateCasePassword({
-        customId,
-        password
-      })
-    if (!userCase) {
-      return next({ code })
-    }
-
-    const { tokens, code: tokenCode } = await this.authService.signToken({
-      sub: userCase.id,
-      loginType: LoginType.CASE,
-      accessTokenExpiresIn: 60 * 24 * 7
-    })
-
-    if (!tokens) {
-      return next({ code: tokenCode })
-    }
-
-    return next({
-      data: {
-        ...tokens,
-        shouldChangePassword: userCase.shouldChangePassword,
-        canAddNotes: userCase.canAddNotes
       },
       code: ResponseCode.OK
     })
@@ -245,8 +175,7 @@ export class AuthController {
       data: {
         user: {
           ...responseUser,
-          roles: userRoleData.userRoles,
-          barnahusRoles: userRoleData.barnahusRoles
+          roles: userRoleData.userRoles
         },
         ...data.tokens
       },
@@ -341,12 +270,21 @@ export class AuthController {
       return next({ code: tokenCode })
     }
 
+    // Store user session in database
+    const { code: sessionCode } = await this.authService.storeUserSession({
+      userId: user.id,
+      refreshToken: tokens.refreshToken,
+      loginType: LoginType.WEB
+    })
+    if (sessionCode !== ResponseCode.OK) {
+      return next({ code: sessionCode })
+    }
+
     return next({
       data: {
         user: {
           ...responseUser,
-          roles: userRoleData.userRoles,
-          barnahusRoles: userRoleData.barnahusRoles
+          roles: userRoleData.userRoles
         },
         ...tokens
       },

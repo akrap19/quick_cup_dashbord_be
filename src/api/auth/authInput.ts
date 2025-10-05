@@ -39,23 +39,6 @@ export const loginUserSchema = (req: Request) => {
   }
 }
 
-export const mobileLoginUserSchema = (req: Request) => {
-  return {
-    schema: Joi.object()
-      .keys({
-        email: Joi.string().trim().email().required(),
-        password: Joi.string().required(),
-        locationCode: Joi.string().allow(null).optional()
-      })
-      .options({ abortEarly: false }),
-    input: {
-      email: req.body.email,
-      password: req.body.password,
-      locationCode: req.body.locationCode
-    }
-  }
-}
-
 export const verifyGetEmailSchema = (req: Request) => {
   return {
     schema: Joi.object()
@@ -104,21 +87,6 @@ export const resetPasswordSchema = (req: Request) => {
       .options({ abortEarly: false }),
     input: {
       uid: req.body.uid,
-      password: req.body.password
-    }
-  }
-}
-
-export const caseLoginSchema = (req: Request) => {
-  return {
-    schema: Joi.object()
-      .keys({
-        customId: Joi.string().required(),
-        password: Joi.string().required()
-      })
-      .options({ abortEarly: false }),
-    input: {
-      customId: req.body.customId,
       password: req.body.password
     }
   }

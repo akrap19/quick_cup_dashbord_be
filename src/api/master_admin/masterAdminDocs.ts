@@ -54,7 +54,7 @@ const paths = {
           name: 'location',
           type: 'string',
           required: false,
-          description: 'Barnahus location'
+          description: 'Location'
         },
         {
           in: 'query',
@@ -194,45 +194,6 @@ const paths = {
       }
     }
   },
-  '/master-admin/assignable': {
-    get: {
-      tags: ['Master Admins'],
-      description: 'Get list of assignable master admins',
-      parameters: [
-        {
-          in: 'query',
-          name: 'search',
-          type: 'string',
-          required: false,
-          description: 'Search query'
-        },
-        {
-          in: 'query',
-          name: 'page',
-          type: 'number',
-          required: true,
-          description: 'Pagination page'
-        },
-        {
-          in: 'query',
-          name: 'limit',
-          type: 'number',
-          required: true,
-          description: 'Pagination limit'
-        }
-      ],
-      responses: {
-        '200': {
-          description: 'Successfully got list of assignable master admins',
-          content: {
-            schema: {
-              $ref: '#/definitions/get_assignable_master_admins_response'
-            }
-          }
-        }
-      }
-    }
-  },
   '/master-admin/bulk': {
     delete: {
       tags: ['Master Admins'],
@@ -289,8 +250,7 @@ const definitions = {
       email: 'john.doe@email.com',
       firstName: 'John',
       lastName: 'Doe',
-      phoneNumber: null,
-      barnahusId: null
+      phoneNumber: null
     }
   },
   get_master_admins_response: {
@@ -305,39 +265,12 @@ const definitions = {
           {
             userId: '43969d61-3f62-4f3f-b8c4-10f3f26b4e51',
             name: 'John Doe',
-            locations: null,
-            deletable: true
+            phoneNumber: null
           },
           {
             userId: '43969d61-3f62-4f3f-b8c4-10f3f26b4e52',
             name: 'Mark Doe',
-            locations: ['Barnahus (SW-ST-1)'],
-            deletable: false
-          }
-        ]
-      },
-      code: 200000,
-      message: 'OK'
-    }
-  },
-  get_assignable_master_admins_response: {
-    example: {
-      data: {
-        pagination: {
-          count: 2,
-          page: 1,
-          limit: 10
-        },
-        users: [
-          {
-            userId: '43969d61-3f62-4f3f-b8c4-10f3f26b4e51',
-            name: 'John Doe',
-            locations: null
-          },
-          {
-            userId: '43969d61-3f62-4f3f-b8c4-10f3f26b4e52',
-            name: 'Mark Doe',
-            locations: null
+            phoneNumber: null
           }
         ]
       },

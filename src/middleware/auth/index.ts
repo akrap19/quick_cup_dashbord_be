@@ -13,7 +13,6 @@ import { UserService } from '../../api/user/userService'
 import { RoleType } from '../../api/role/interface'
 import { container } from 'tsyringe'
 import { LoginType } from '../../api/user_session/interface'
-import { CaseService } from '../../api/case/caseService'
 import { AuthService } from '../../api/auth/authService'
 
 const authenticatedDocUsers: { [key: string]: string } = {
@@ -44,26 +43,6 @@ export const requireToken = async (
       !decodedToken.sub
     ) {
       throw new ResponseError(ResponseCode.INVALID_TOKEN)
-    }
-
-    if (decodedToken.loginType == LoginType.CASE) {
-      const { case: userCase } = await container.resolve(CaseService).getCase({
-        caseId: decodedToken.sub
-      })
-
-      if (!userCase) {
-        throw new ResponseError(ResponseCode.INVALID_TOKEN)
-      }
-
-      req.user = {
-        id: decodedToken.sub,
-        loginType: decodedToken.loginType,
-        barnahusId: userCase.barnahusId,
-        roles: [],
-        authenticatedRoles: []
-      }
-
-      return next()
     }
 
     const { user } = await container.resolve(UserService).getUserById({

@@ -21,10 +21,10 @@ import { getResponseMessage } from '../../services/utils'
 import { randomBytes } from 'node:crypto'
 import { compare, hashString } from '../../services/bcrypt'
 import { VerificationUIDService } from '../verification_uid/verificationUIDService'
-import { EmailTemplateService } from '../email_template/emailTemplateService'
 import { VerificationUIDType } from '../verification_uid/interface'
-import { EmailTemplates } from '../email_template/interface'
+import { EmailTemplates } from '../../services/email/templates'
 import config from '../../config'
+import { emailService } from '../../services/email'
 import { RoleType } from '../role/interface'
 import { autoInjectable } from 'tsyringe'
 
@@ -32,15 +32,10 @@ import { autoInjectable } from 'tsyringe'
 export class UserService implements IUserService {
   private readonly userRepository: Repository<User>
   private readonly verificationUIDService: VerificationUIDService
-  private readonly emailTemplateService: EmailTemplateService
 
-  constructor(
-    verificationUIDService: VerificationUIDService,
-    emailTemplateService: EmailTemplateService
-  ) {
+  constructor(verificationUIDService: VerificationUIDService) {
     this.userRepository = AppDataSource.manager.getRepository(User)
     this.verificationUIDService = verificationUIDService
-    this.emailTemplateService = emailTemplateService
   }
 
   createUser = async ({
@@ -92,7 +87,6 @@ export class UserService implements IUserService {
     userId,
     allUsers,
     role,
-    barnahusId,
     queryRunner
   }: IGetUserById) => {
     let code: ResponseCode = ResponseCode.OK
@@ -102,18 +96,10 @@ export class UserService implements IUserService {
         .createQueryBuilder('user', queryRunner)
         .leftJoinAndSelect('user.userRoles', 'userRole')
         .leftJoinAndSelect('userRole.role', 'role')
-        .leftJoinAndSelect('userRole.userRoleBarnahuses', 'userRoleBarnahus')
-        .leftJoinAndSelect('userRoleBarnahus.barnahus', 'barnahus')
         .where('user.id = :userId', { userId })
 
       if (role) {
         query.andWhere('role.name = :roleName', { roleName: role })
-      }
-
-      if (barnahusId) {
-        query.andWhere('userRoleBarnahus.barnahusId = :barnahusId', {
-          barnahusId
-        })
       }
 
       if (!allUsers) {
@@ -139,54 +125,20 @@ export class UserService implements IUserService {
     return { code }
   }
 
-  getUsers = async ({
-    search,
-    page,
-    limit,
-    role,
-    location,
-    hasBarnahus = true,
-    barnahusId
-  }: IGetUsers) => {
+  getUsers = async ({ search, page, limit, role }: IGetUsers) => {
     let code: ResponseCode = ResponseCode.OK
 
     try {
-      if (
-        role != RoleType.MASTER_ADMIN &&
-        role != RoleType.SUPER_ADMIN &&
-        !barnahusId
-      ) {
-        return { code: ResponseCode.BARNAHUS_REQUIRED }
-      }
-
-      if (!hasBarnahus && barnahusId) {
-        return { code: ResponseCode.BARNAHUS_NOT_FOUND }
-      }
-
       let query = this.userRepository
         .createQueryBuilder('user')
         .leftJoinAndSelect('user.userRoles', 'userRole')
-        .leftJoinAndSelect('userRole.userRoleBarnahuses', 'userRoleBarnahus')
-        .leftJoinAndSelect('userRoleBarnahus.barnahus', 'barnahus')
         .leftJoinAndSelect('userRole.role', 'role')
-        .leftJoinAndSelect('userRoleBarnahus.assignedBy', 'assignedBy')
+        .andWhere('user.status != :deletedStatus', {
+          deletedStatus: UserStatus.DELETED
+        })
 
       if (role) {
         query.andWhere('role.name = :roleName', { roleName: role })
-      }
-
-      if (location) {
-        query.andWhere('barnahus.location = :location', { location })
-      }
-
-      if (barnahusId) {
-        query.andWhere('userRoleBarnahus.barnahusId = :barnahusId', {
-          barnahusId
-        })
-      }
-
-      if (!hasBarnahus) {
-        query.andWhere('userRoleBarnahus.userRoleId IS NULL')
       }
 
       if (search) {
@@ -442,7 +394,7 @@ export class UserService implements IUserService {
         userId,
         newEmail: email
       })
-      if (code != ResponseCode.OK) {
+      if (editCode != ResponseCode.OK) {
         await queryRunner.rollbackTransaction()
         await queryRunner.release()
         return { code: editCode }
@@ -460,17 +412,24 @@ export class UserService implements IUserService {
       }
 
       // send email with confirmation link to new email address
-      const { code: emailCode } = await this.emailTemplateService.sendEmail({
-        to: email,
-        template: EmailTemplates.EMAIL_CONFIRMATION,
-        data: {
-          URL: `${config.API_BASE_URL}/user/validateEmail/${uids.uid}/${uids.hashUID}`
-        }
-      })
-      if (emailCode != ResponseCode.OK) {
+      try {
+        await emailService.sendEmail({
+          to: email,
+          template: EmailTemplates.EMAIL_CONFIRMATION,
+          data: {
+            URL: `${config.CLIENT_BASE_URL}/validate-email?uid=${uids.uid}/${uids.hashUID}`
+          }
+        })
+      } catch (emailErr: any) {
         await queryRunner.rollbackTransaction()
         await queryRunner.release()
-        return { code: emailCode }
+        code = ResponseCode.SERVER_ERROR
+        logger.error({
+          code,
+          message: 'Failed to send email confirmation',
+          stack: emailErr.stack
+        })
+        return { code }
       }
 
       await queryRunner.commitTransaction()

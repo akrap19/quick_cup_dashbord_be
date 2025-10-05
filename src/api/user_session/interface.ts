@@ -8,9 +8,7 @@ export enum UserSessionStatus {
 }
 
 export enum LoginType {
-  WEB = 'web',
-  MOBILE = 'mobile',
-  CASE = 'case'
+  WEB = 'web'
 }
 
 export interface IStoreUserSession {

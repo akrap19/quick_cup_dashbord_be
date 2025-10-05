@@ -10,15 +10,6 @@ const paths = {
     get: {
       tags: ['User Settings'],
       description: 'Get user settings',
-      parameters: [
-        {
-          in: 'header',
-          name: 'X-Barnahus-ID',
-          type: 'string',
-          required: false,
-          description: 'Barnahus ID'
-        }
-      ],
       responses: {
         '200': {
           description: 'Successfully got user settings',
@@ -156,9 +147,7 @@ const definitions = {
         lastName: 'Doe',
         email: 'test@email.com',
         newEmail: 'new@email.com',
-        phoneNumber: null,
-        locationCode: 'SW-ST-1',
-        barnahusName: 'Barnahus'
+        phoneNumber: null
       },
       code: 200000,
       message: 'OK'

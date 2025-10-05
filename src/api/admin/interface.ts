@@ -6,13 +6,11 @@ export interface IEditUser {
   firstName: string
   lastName: string
   phoneNumber: string
-  barnahusId: string
 }
 
 export interface IUsersLimited {
   userId: string
   name: string
-  location: string | null
 }
 
 export interface IUsersPaginationLimited {
@@ -30,10 +28,11 @@ export interface ICreateAdmin {
   email: string
   phoneNumber?: string
   assignedById: string
-  barnahusId: string
 }
 
 export interface IAdminService {
   createAdmin(params: ICreateAdmin): AsyncResponse<null>
   editAdmin(params: IEditUser): AsyncResponse<User>
+  deleteAdmin(params: { userId: string }): AsyncResponse<null>
+  bulkDeleteAdmins(params: { userIds: string[] }): AsyncResponse<null>
 }

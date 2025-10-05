@@ -1,6 +1,5 @@
 import { AsyncResponse } from '../../interface'
 import { ApiKey } from './apiKeyModel'
-import { Case } from '../case/caseModel'
 import { RoleType } from '../role/interface'
 import { User } from '../user/userModel'
 import { UserRole } from '../user_role/userRoleModel'
@@ -9,30 +8,14 @@ import { LoginType } from '../user_session/interface'
 export interface IUserRole {
   userRoleId: string
   name: string
-  barnahuses: {
-    barnahusId: string
-    name: string
-    location: string
-  }[]
 }
 export interface ICheckUserSpecificRole {
   userId: string
   roles: RoleType[]
 }
 
-export interface IUserRoleBarnahus {
-  barnahusId: string
-  name: string
-  location: string
-  userRoles: {
-    userRoleId: string
-    name: string
-  }[]
-}
-
 export interface IGetUserRoleListResponse {
   userRoles: IUserRole[]
-  barnahusRoles: IUserRoleBarnahus[]
 }
 
 export interface IVerifyUser {
@@ -87,25 +70,21 @@ export interface IRefreshTokenResponse {
   user: User
 }
 
-export interface IAuthenticateCasePassword {
-  customId: string
-  password: string
-}
-
-export interface IChangeCasePassword {
-  caseId: string
-  password: string
-  newPassword: string
-}
-
 export interface IGetApiKey {
   key: string
+}
+
+export interface IStoreUserSession {
+  userId: string
+  refreshToken: string
+  loginType: LoginType
 }
 
 export interface IAuthService {
   verifyUser(params: IVerifyUser): AsyncResponse<User>
   authenticatePassword(params: ICheckCredentials): AsyncResponse<User>
   signToken(params: ISignToken): AsyncResponse<TokenResponse>
+  storeUserSession(params: IStoreUserSession): AsyncResponse<null>
   refreshToken(params: IRefreshToken): AsyncResponse<IRefreshTokenResponse>
   logout(params: ILogout): AsyncResponse<boolean>
   getUserRoleList(
@@ -114,8 +93,5 @@ export interface IAuthService {
   sendForgotPasswordEmail(params: ISendForgotPasswordEmail): AsyncResponse<null>
   resetPassword(params: IResetPassword): AsyncResponse<string>
   checkIfSpecificRole(params: ICheckUserSpecificRole): AsyncResponse<UserRole[]>
-  authenticateCasePassword(
-    params: IAuthenticateCasePassword
-  ): AsyncResponse<Case>
   getApiKey(params: IGetApiKey): AsyncResponse<ApiKey>
 }

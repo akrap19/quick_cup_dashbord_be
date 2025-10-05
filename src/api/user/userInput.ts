@@ -51,6 +51,7 @@ export const userEmailSchema = (req: Request) => {
 }
 
 export const validateEmailSchema = (req: Request) => {
+  console.log('matijaaaaaaa', req.query.uid, req.query.hashUid)
   return {
     schema: Joi.object()
       .keys({
@@ -67,8 +68,8 @@ export const validateEmailSchema = (req: Request) => {
       })
       .options({ abortEarly: false }),
     input: {
-      uid: req.params.uid,
-      hashUid: req.params.hashUid
+      uid: req.query.uid,
+      hashUid: req.query.hashUid
     }
   }
 }

@@ -10,15 +10,6 @@ const paths = {
     post: {
       tags: ['Admins'],
       description: 'Creates admin or adds admin role ',
-      parameters: [
-        {
-          in: 'header',
-          name: 'X-Barnahus-ID',
-          type: 'string',
-          required: true,
-          description: 'Barnahus ID'
-        }
-      ],
       requestBody: {
         content: {
           'application/json': {
@@ -71,13 +62,6 @@ const paths = {
           type: 'number',
           required: true,
           description: 'Pagination limit'
-        },
-        {
-          in: 'header',
-          name: 'X-Barnahus-ID',
-          type: 'string',
-          required: true,
-          description: 'Barnahus ID'
         }
       ],
       responses: {
@@ -102,15 +86,6 @@ const paths = {
     put: {
       tags: ['Admins'],
       description: 'Edit admin ',
-      parameters: [
-        {
-          in: 'header',
-          name: 'X-Barnahus-ID',
-          type: 'string',
-          required: true,
-          description: 'Barnahus ID'
-        }
-      ],
       requestBody: {
         content: {
           'application/json': {
@@ -142,15 +117,6 @@ const paths = {
     delete: {
       tags: ['Admins'],
       description: 'Delete admin ',
-      parameters: [
-        {
-          in: 'header',
-          name: 'X-Barnahus-ID',
-          type: 'string',
-          required: true,
-          description: 'Barnahus ID'
-        }
-      ],
       requestBody: {
         content: {
           'application/json': {
@@ -199,13 +165,6 @@ const paths = {
           type: 'string',
           required: false,
           description: 'Admin ID'
-        },
-        {
-          in: 'header',
-          name: 'X-Barnahus-ID',
-          type: 'string',
-          required: true,
-          description: 'Barnahus ID'
         }
       ],
       responses: {
@@ -232,15 +191,6 @@ const paths = {
     delete: {
       tags: ['Admins'],
       description: 'Bulk delete admin ',
-      parameters: [
-        {
-          in: 'header',
-          name: 'X-Barnahus-ID',
-          type: 'string',
-          required: true,
-          description: 'Barnahus ID'
-        }
-      ],
       requestBody: {
         content: {
           'application/json': {
@@ -307,13 +257,11 @@ const definitions = {
         users: [
           {
             userId: '43969d61-3f62-4f3f-b8c4-10f3f26b4e51',
-            name: 'John Doe',
-            location: null
+            name: 'John Doe'
           },
           {
             userId: '43969d61-3f62-4f3f-b8c4-10f3f26b4e52',
-            name: 'Mark Doe',
-            location: 'Stockholm, Sweden'
+            name: 'Mark Doe'
           }
         ]
       },
@@ -329,8 +277,7 @@ const definitions = {
           firstName: 'John',
           lastName: 'Doe',
           email: 'john.doe@email.com',
-          phoneNumber: null,
-          location: 'Stockholm, Sweden'
+          phoneNumber: null
         }
       },
       code: 200000,

@@ -21,7 +21,6 @@ export class MediaController {
 
   uploadMedia = async (req: Request, res: Response, next: NextFunction) => {
     const { type } = res.locals.input
-    const { barnahusId } = req.user
 
     if (!req.files || !req.files.media) {
       return next({ code: ResponseCode.FILE_NOT_FOUND })
@@ -61,7 +60,7 @@ export class MediaController {
 
     const { mediaId, code } = await this.mediaService.createMedia({
       type,
-      path: `barnahus/${barnahusId}/${type.toLowerCase()}/`,
+      path: `${type.toLowerCase()}/`,
       file: media
     })
 

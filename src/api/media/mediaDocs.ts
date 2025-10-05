@@ -12,13 +12,6 @@ const paths = {
       description: 'Upload media\n- type can be Image, Audio, or Video',
       parameters: [
         {
-          in: 'header',
-          name: 'X-Barnahus-ID',
-          type: 'string',
-          required: true,
-          description: 'Barnahus ID'
-        },
-        {
           in: 'query',
           name: 'type',
           type: 'string',
@@ -80,17 +73,6 @@ const paths = {
     delete: {
       tags: ['Media'],
       description: 'Delete media section',
-      parameters: [
-        {
-          in: 'header',
-          name: 'X-Barnahus-ID',
-          schema: {
-            type: 'string'
-          },
-          required: true,
-          description: 'Barnahus ID'
-        }
-      ],
       requestBody: {
         content: {
           'application/json': {

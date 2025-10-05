@@ -43,13 +43,13 @@ export class AddAuth1704499440693 implements MigrationInterface {
     //Insert super admin
     const hashedPassword = await hashString(config.SUPER_ADMIN_PASSWORD)
     const id = generateUUID()
-    queryRunner.query(  
+    queryRunner.query(
       `INSERT INTO user(id, email, password, first_name, last_name, status)
       VALUES('${id}', '${config.SUPER_ADMIN_EMAIL}', '${hashedPassword}', 'Super', 'Admin', '${UserStatus.ACTIVE}')`
     )
 
-    const [role] = await queryRunner.query(  
-      `SELECT id FROM role WHERE name = '${RoleType.SUPER_ADMIN}';`
+    const [role] = await queryRunner.query(
+      `SELECT id FROM role WHERE name = '${RoleType.MASTER_ADMIN}';`
     )
 
     await queryRunner.manager.insert(UserRole, {
