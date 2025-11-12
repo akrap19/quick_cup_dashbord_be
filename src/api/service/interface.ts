@@ -1,20 +1,32 @@
-import { AsyncResponse, IServiceMethod, ResponseCode } from '../../interface'
-import { User } from '../user/userModel'
+import { AsyncResponse, IServiceMethod } from '../../interface'
 
-export interface IEditUser {
-  userId: string
-  firstName: string
-  lastName: string
-  phoneNumber: string
-}
-
-export interface IServicesLimited {
-  userId: string
+export interface ICreateService extends IServiceMethod {
   name: string
+  description?: string | null
 }
 
-export interface IServicesPaginationLimited {
-  users: IServicesLimited[]
+export interface IUpdateService extends IServiceMethod {
+  serviceId: string
+  name?: string
+  description?: string | null
+}
+
+export interface IDeleteService extends IServiceMethod {
+  serviceId: string
+}
+
+export interface IGetServiceById extends IServiceMethod {
+  serviceId: string
+}
+
+export interface IListServices extends IServiceMethod {
+  search?: string | null
+  page?: number
+  limit?: number
+}
+
+export interface IServicesPagination<T = unknown> {
+  services: T[]
   pagination: {
     count: number
     page: number
@@ -22,17 +34,10 @@ export interface IServicesPaginationLimited {
   }
 }
 
-export interface ICreateService {
-  firstName: string
-  lastName: string
-  email: string
-  phoneNumber?: string
-  assignedById: string
-}
-
-export interface IServiceService {
-  createService(params: ICreateService): AsyncResponse<null>
-  editService(params: IEditUser): AsyncResponse<User>
-  deleteService(params: { userId: string }): AsyncResponse<null>
-  bulkDeleteServices(params: { userIds: string[] }): AsyncResponse<null>
+export interface IServiceService<T = unknown> {
+  listServices(params: IListServices): AsyncResponse<IServicesPagination<T>>
+  getServiceById(params: IGetServiceById): AsyncResponse<T>
+  createService(params: ICreateService): AsyncResponse<T>
+  updateService(params: IUpdateService): AsyncResponse<T>
+  deleteService(params: IDeleteService): AsyncResponse<null>
 }

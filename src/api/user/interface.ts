@@ -23,6 +23,7 @@ export interface IUsersPagination {
 export enum UserStatus {
   CREATED = 'Created',
   ACTIVE = 'Active',
+  BLOCKED = 'Blocked',
   DELETED = 'Deleted'
 }
 
@@ -31,6 +32,7 @@ export interface ICreateUser extends IServiceMethod {
   lastName: string
   email: string
   phoneNumber?: string
+  location?: string
 }
 
 export interface IGetUserById extends IServiceMethod {
@@ -56,6 +58,7 @@ export interface IEditUser extends IServiceMethod {
   firstName?: string
   lastName?: string
   phoneNumber?: string | null
+  location?: string | null
   status?: UserStatus
 }
 

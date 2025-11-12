@@ -6,6 +6,7 @@ export interface IEditUser {
   firstName: string
   lastName: string
   phoneNumber: string
+  location: string
 }
 
 interface IUsersPagination {
@@ -36,6 +37,7 @@ export interface ICreateClient {
   lastName: string
   email: string
   phoneNumber?: string
+  location: string
   assignedById: string
 }
 

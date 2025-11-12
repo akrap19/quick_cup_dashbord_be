@@ -46,7 +46,8 @@ export class AdminController {
           userId: user.id,
           name: user.firstName + ' ' + user.lastName,
           email: user.email,
-          phoneNumber: user.phoneNumber
+          phoneNumber: user.phoneNumber,
+          status: user.status
         }
       })
 
@@ -78,7 +79,8 @@ export class AdminController {
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
-      phoneNumber: user.phoneNumber
+      phoneNumber: user.phoneNumber,
+      status: user.status
     }
 
     return next({ data: { admin }, code })

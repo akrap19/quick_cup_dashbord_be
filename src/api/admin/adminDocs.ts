@@ -243,7 +243,8 @@ const definitions = {
       email: 'john.doe@email.com',
       firstName: 'John',
       lastName: 'Doe',
-      phoneNumber: null
+      phoneNumber: null,
+      status: 'Active'
     }
   },
   get_admins_response: {
@@ -277,7 +278,8 @@ const definitions = {
           firstName: 'John',
           lastName: 'Doe',
           email: 'john.doe@email.com',
-          phoneNumber: null
+          phoneNumber: null,
+          status: 'Active'
         }
       },
       code: 200000,

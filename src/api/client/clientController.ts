@@ -16,7 +16,8 @@ export class ClientController {
   }
 
   addClient = async (req: Request, res: Response, next: NextFunction) => {
-    const { email, firstName, lastName, phoneNumber } = res.locals.input
+    const { email, firstName, lastName, phoneNumber, location } =
+      res.locals.input
     const { id } = req.user
     const { user, code } = await this.userService.getUserById({
       userId: id,
@@ -31,6 +32,7 @@ export class ClientController {
       lastName,
       email,
       phoneNumber,
+      location,
       assignedById: id
     })
 
@@ -50,21 +52,12 @@ export class ClientController {
     }
 
     const usersLimited: IClientsLimited[] = userData.users.map((user) => {
-      const clientUserRole = user.userRoles.find(
-        (userRole) => userRole.role.name == RoleType.CLIENT
-      )
-
-      const assignedBy =
-        clientUserRole?.assignedBy?.firstName +
-        ' ' +
-        clientUserRole?.assignedBy?.lastName
-
       return {
         userId: user.id,
         name: user.firstName + ' ' + user.lastName,
         email: user.email,
         phoneNumber: user.phoneNumber,
-        assignedBy
+        status: user.status
       }
     })
 
@@ -97,7 +90,11 @@ export class ClientController {
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
-      phoneNumber: user.phoneNumber
+      phoneNumber: user.phoneNumber,
+      location: user.location,
+      status: user.status,
+      assignedBy:
+        client?.assignedBy?.firstName + ' ' + client?.assignedBy?.lastName
     }
 
     return next({ data: clientData, code })
@@ -128,13 +125,15 @@ export class ClientController {
   }
 
   editClient = async (req: Request, res: Response, next: NextFunction) => {
-    const { userId, firstName, lastName, phoneNumber } = res.locals.input
+    const { userId, firstName, lastName, phoneNumber, location } =
+      res.locals.input
 
     const { code } = await this.clientService.editClient({
       userId,
       firstName,
       lastName,
-      phoneNumber
+      phoneNumber,
+      location
     })
 
     return next({ code })

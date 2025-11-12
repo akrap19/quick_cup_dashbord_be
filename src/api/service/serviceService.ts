@@ -1,159 +1,198 @@
-import { ResponseCode } from '../../interface'
+import { Repository } from 'typeorm'
+import { autoInjectable } from 'tsyringe'
+
+import { AsyncResponse, ResponseCode } from '../../interface'
 import { AppDataSource } from '../../services/typeorm'
 import { logger } from '../../logger'
 import { getResponseMessage } from '../../services/utils'
-import { RoleName, RoleType } from '../role/interface'
-import { UserService } from '../user/userService'
-import { UserRoleService } from '../user_role/userRoleService'
-import { IServiceService, ICreateService, IEditUser } from './interface'
-import { User } from '../user/userModel'
-import { VerificationUIDService } from '../verification_uid/verificationUIDService'
-import { VerificationUIDType } from '../verification_uid/interface'
-import config from '../../config'
-import { EmailTemplates } from '../../services/email/templates'
-import { autoInjectable } from 'tsyringe'
-import { emailService } from '../../services/email'
+import {
+  ICreateService,
+  IDeleteService,
+  IGetServiceById,
+  IListServices,
+  IServiceService,
+  IServicesPagination,
+  IUpdateService
+} from './interface'
+import { ServiceModel } from './serviceModel'
+
+type ListServicesResponse = Awaited<
+  AsyncResponse<IServicesPagination<ServiceModel>>
+>
+type ServiceResponse = Awaited<AsyncResponse<ServiceModel>>
+type DeleteResponse = Awaited<AsyncResponse<null>>
 
 @autoInjectable()
-export class ServiceService implements IServiceService {
-  private readonly userService: UserService
-  private readonly userRoleService: UserRoleService
-  private readonly verificationUIDService: VerificationUIDService
+export class ServicesService implements IServiceService<ServiceModel> {
+  private readonly serviceRepository: Repository<ServiceModel>
 
-  constructor(
-    userService: UserService,
-    userRoleService: UserRoleService,
-    verificationUIDService: VerificationUIDService
-  ) {
-    this.userService = userService
-    this.userRoleService = userRoleService
-    this.verificationUIDService = verificationUIDService
+  constructor() {
+    this.serviceRepository = AppDataSource.manager.getRepository(ServiceModel)
+  }
+
+  listServices = async ({
+    search,
+    page = 1,
+    limit = 25,
+    queryRunner
+  }: IListServices): AsyncResponse<IServicesPagination<ServiceModel>> => {
+    let code: ResponseCode = ResponseCode.OK
+
+    try {
+      const currentPage = page && page > 0 ? page : 1
+      const currentLimit = limit && limit > 0 ? limit : 25
+
+      const repository = queryRunner
+        ? queryRunner.manager.getRepository(ServiceModel)
+        : this.serviceRepository
+
+      const query = repository.createQueryBuilder('service')
+
+      if (search) {
+        const searchLike = `%${search.toLowerCase()}%`
+        query.andWhere(
+          '(LOWER(service.name) LIKE :searchLike OR LOWER(service.description) LIKE :searchLike)',
+          { searchLike }
+        )
+      }
+
+      const offset = (currentPage - 1) * currentLimit
+
+      const [services, count] = await query
+        .orderBy('service.createdAt', 'DESC')
+        .skip(offset)
+        .take(currentLimit)
+        .getManyAndCount()
+
+      const response = {
+        services,
+        pagination: {
+          count,
+          page: currentPage,
+          limit: currentLimit
+        },
+        code
+      }
+
+      return response as unknown as ListServicesResponse
+    } catch (err: any) {
+      code = ResponseCode.SERVER_ERROR
+      logger.error({
+        code,
+        message: getResponseMessage(code),
+        stack: err.stack
+      })
+    }
+
+    return { code } as unknown as ListServicesResponse
+  }
+
+  getServiceById = async ({
+    serviceId,
+    queryRunner
+  }: IGetServiceById): AsyncResponse<ServiceModel> => {
+    let code: ResponseCode = ResponseCode.OK
+
+    try {
+      const repository = queryRunner
+        ? queryRunner.manager.getRepository(ServiceModel)
+        : this.serviceRepository
+
+      const service = await repository.findOne({ where: { id: serviceId } })
+
+      if (!service) {
+        return { code: ResponseCode.NOT_FOUND }
+      }
+
+      return { service, code } as unknown as ServiceResponse
+    } catch (err: any) {
+      code = ResponseCode.SERVER_ERROR
+      logger.error({
+        code,
+        message: getResponseMessage(code),
+        stack: err.stack
+      })
+    }
+
+    return { code } as unknown as ServiceResponse
   }
 
   createService = async ({
-    firstName,
-    lastName,
-    email,
-    phoneNumber,
-    assignedById
-  }: ICreateService) => {
+    name,
+    description,
+    queryRunner
+  }: ICreateService): AsyncResponse<ServiceModel> => {
     let code: ResponseCode = ResponseCode.OK
-    const queryRunner = AppDataSource.createQueryRunner()
-    let user: User
 
     try {
-      await queryRunner.connect()
-      await queryRunner.startTransaction()
+      const repository = queryRunner
+        ? queryRunner.manager.getRepository(ServiceModel)
+        : this.serviceRepository
 
-      const { user: existingUser } = await this.userService.getUserByEmail({
-        email
+      const service = repository.create({
+        name,
+        description: description ?? null
       })
 
-      let sendEmail = false
-      if (!existingUser) {
-        const { user: newUser, code: newUserCode } =
-          await this.userService.createUser({
-            firstName,
-            lastName,
-            email,
-            phoneNumber,
-            queryRunner
-          })
-        if (!newUser) {
-          await queryRunner.rollbackTransaction()
-          await queryRunner.release()
-          return { code: newUserCode }
-        }
+      const savedService = await repository.save(service)
 
-        const { uids, code: uidCode } =
-          await this.verificationUIDService.setVerificationUID({
-            userId: newUser.id,
-            type: VerificationUIDType.REGISTRATION,
-            queryRunner
-          })
-        if (!uids) {
-          await queryRunner.rollbackTransaction()
-          await queryRunner.release()
-          return { code: uidCode }
-        }
+      return { service: savedService, code } as unknown as ServiceResponse
+    } catch (err: any) {
+      code = ResponseCode.SERVER_ERROR
+      logger.error({
+        code,
+        message: getResponseMessage(code),
+        stack: err.stack
+      })
+    }
 
-        await emailService.sendEmail({
-          to: email,
-          template: EmailTemplates.INVITATION,
-          data: {
-            URL: `${config.CLIENT_BASE_URL}/register?uid=${uids.uid}/${uids.hashUID}`,
-            ROLE: RoleName.SERVICE
-          }
-        })
+    return { code } as unknown as ServiceResponse
+  }
 
-        user = newUser
-      } else {
-        const { code: editCode } = await this.userService.editUser({
-          userId: existingUser.id,
-          firstName,
-          lastName,
-          phoneNumber
-        })
+  updateService = async ({
+    serviceId,
+    name,
+    description,
+    queryRunner
+  }: IUpdateService): AsyncResponse<ServiceModel> => {
+    let code: ResponseCode = ResponseCode.OK
 
-        if (editCode != ResponseCode.OK) {
-          await queryRunner.rollbackTransaction()
-          await queryRunner.release()
-          return { code: editCode }
-        }
+    try {
+      const updateData: Partial<ServiceModel> = {}
 
-        user = existingUser
-        sendEmail = true
+      if (typeof name !== 'undefined') {
+        updateData.name = name
       }
 
-      const { code: assignRoleCode } = await this.userRoleService.assignRole({
-        userId: user.id,
-        roleName: RoleType.SERVICE,
-        assignedById,
+      if (typeof description !== 'undefined') {
+        updateData.description = description ?? null
+      }
+
+      const repository = queryRunner
+        ? queryRunner.manager.getRepository(ServiceModel)
+        : this.serviceRepository
+
+      const result = await repository
+        .createQueryBuilder()
+        .update(ServiceModel)
+        .set(updateData)
+        .where('id = :serviceId', { serviceId })
+        .execute()
+
+      if (!result.affected) {
+        return { code: ResponseCode.NOT_FOUND }
+      }
+
+      const { service, code: getCode } = await this.getServiceById({
+        serviceId,
         queryRunner
       })
 
-      if (
-        assignRoleCode != ResponseCode.OK &&
-        assignRoleCode != ResponseCode.CONFLICT_USER_ROLE
-      ) {
-        await queryRunner.rollbackTransaction()
-        await queryRunner.release()
-        return { code: assignRoleCode }
+      if (!service) {
+        return { code: getCode }
       }
 
-      await queryRunner.commitTransaction()
-      await queryRunner.release()
-    } catch (err: any) {
-      code = ResponseCode.SERVER_ERROR
-      logger.error({
-        code,
-        message: getResponseMessage(code),
-        stack: err.stack
-      })
-      await queryRunner.rollbackTransaction()
-      await queryRunner.release()
-    }
-
-    return { code }
-  }
-
-  editService = async ({
-    userId,
-    firstName,
-    lastName,
-    phoneNumber
-  }: IEditUser) => {
-    let code: ResponseCode = ResponseCode.OK
-
-    try {
-      const { code: editCode } = await this.userService.editUser({
-        userId,
-        firstName,
-        lastName,
-        phoneNumber
-      })
-
-      return { code: editCode }
+      return { service, code } as unknown as ServiceResponse
     } catch (err: any) {
       code = ResponseCode.SERVER_ERROR
       logger.error({
@@ -163,45 +202,27 @@ export class ServiceService implements IServiceService {
       })
     }
 
-    return { code }
+    return { code } as unknown as ServiceResponse
   }
 
-  deleteService = async ({ userId }: { userId: string }) => {
+  deleteService = async ({
+    serviceId,
+    queryRunner
+  }: IDeleteService): AsyncResponse<null> => {
     let code: ResponseCode = ResponseCode.OK
 
     try {
-      const { code: deleteCode } = await this.userService.anonymizeUser({
-        userId
-      })
+      const repository = queryRunner
+        ? queryRunner.manager.getRepository(ServiceModel)
+        : this.serviceRepository
 
-      return { code: deleteCode }
-    } catch (err: any) {
-      code = ResponseCode.SERVER_ERROR
-      logger.error({
-        code,
-        message: getResponseMessage(code),
-        stack: err.stack
-      })
-    }
+      const result = await repository.delete({ id: serviceId })
 
-    return { code }
-  }
-
-  bulkDeleteServices = async ({ userIds }: { userIds: string[] }) => {
-    let code: ResponseCode = ResponseCode.OK
-
-    try {
-      for (const userId of userIds) {
-        const { code: deleteCode } = await this.userService.anonymizeUser({
-          userId
-        })
-
-        if (deleteCode !== ResponseCode.OK) {
-          return { code: deleteCode }
-        }
+      if (!result.affected) {
+        return { code: ResponseCode.NOT_FOUND }
       }
 
-      return { code: ResponseCode.OK }
+      return { code } as unknown as DeleteResponse
     } catch (err: any) {
       code = ResponseCode.SERVER_ERROR
       logger.error({
@@ -211,6 +232,6 @@ export class ServiceService implements IServiceService {
       })
     }
 
-    return { code }
+    return { code } as unknown as DeleteResponse
   }
 }

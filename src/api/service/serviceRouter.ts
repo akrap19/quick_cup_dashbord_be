@@ -1,65 +1,57 @@
 import express from 'express'
-import { ServiceController } from './serviceController'
+import { ServicesController } from './serviceController'
 import {
-  addServiceSchema,
-  getServicesSchema,
-  editServiceSchema,
-  getServiceSchema,
-  deleteServiceSchema,
-  bulkDeleteServiceSchema
+  createServiceSchema,
+  listServicesSchema,
+  serviceIdParamSchema,
+  updateServiceSchema
 } from './serviceInput'
 import { requireRole, requireToken } from '../../middleware/auth'
 import { RoleType } from '../role/interface'
 import { validate } from '../../middleware/validation'
 import { container } from 'tsyringe'
 
-const serviceController = container.resolve(ServiceController)
+const adminRoles = [RoleType.MASTER_ADMIN, RoleType.ADMIN]
+
+const servicesController = container.resolve(ServicesController)
 export const serviceRouter = express.Router()
+
+serviceRouter.get(
+  '/',
+  requireToken,
+  requireRole(adminRoles),
+  validate(listServicesSchema),
+  servicesController.listServices
+)
+
+serviceRouter.get(
+  '/:serviceId',
+  requireToken,
+  requireRole(adminRoles),
+  validate(serviceIdParamSchema),
+  servicesController.getService
+)
 
 serviceRouter.post(
   '/',
   requireToken,
-  requireRole([RoleType.MASTER_ADMIN]),
-  validate(addServiceSchema),
-  serviceController.addService
-)
-
-serviceRouter.get(
-  '/',
-  requireToken,
-  requireRole([RoleType.MASTER_ADMIN]),
-  validate(getServicesSchema),
-  serviceController.getServices
-)
-
-serviceRouter.get(
-  '/:id',
-  requireToken,
-  requireRole([RoleType.MASTER_ADMIN]),
-  validate(getServiceSchema),
-  serviceController.getService
+  requireRole(adminRoles),
+  validate(createServiceSchema),
+  servicesController.createService
 )
 
 serviceRouter.put(
-  '/',
+  '/:serviceId',
   requireToken,
-  requireRole([RoleType.MASTER_ADMIN]),
-  validate(editServiceSchema),
-  serviceController.editService
+  requireRole(adminRoles),
+  validate(updateServiceSchema),
+  servicesController.updateService
 )
 
 serviceRouter.delete(
-  '/',
+  '/:serviceId',
   requireToken,
-  requireRole([RoleType.MASTER_ADMIN]),
-  validate(deleteServiceSchema),
-  serviceController.deleteService
-)
-
-serviceRouter.delete(
-  '/bulk',
-  requireToken,
-  requireRole([RoleType.MASTER_ADMIN]),
-  validate(bulkDeleteServiceSchema),
-  serviceController.bulkDeleteServices
+  requireRole(adminRoles),
+  validate(serviceIdParamSchema),
+  servicesController.deleteService
 )

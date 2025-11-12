@@ -35,6 +35,7 @@ export class ClientService implements IClientService {
     lastName,
     email,
     phoneNumber,
+    location,
     assignedById
   }: ICreateClient) => {
     let code: ResponseCode = ResponseCode.OK
@@ -57,6 +58,7 @@ export class ClientService implements IClientService {
             lastName,
             email,
             phoneNumber,
+            location,
             queryRunner
           })
         if (!newUser) {
@@ -141,7 +143,8 @@ export class ClientService implements IClientService {
     userId,
     firstName,
     lastName,
-    phoneNumber
+    phoneNumber,
+    location
   }: IEditUser) => {
     let code: ResponseCode = ResponseCode.OK
 
@@ -150,7 +153,8 @@ export class ClientService implements IClientService {
         userId,
         firstName,
         lastName,
-        phoneNumber
+        phoneNumber,
+        location: location as string | null
       })
 
       if (editUserCode != ResponseCode.OK) {

@@ -43,6 +43,7 @@ export class UserService implements IUserService {
     lastName,
     phoneNumber,
     email,
+    location,
     queryRunner
   }: ICreateUser) => {
     let code: ResponseCode = ResponseCode.OK
@@ -52,7 +53,7 @@ export class UserService implements IUserService {
         .createQueryBuilder('user', queryRunner)
         .insert()
         .into(User)
-        .values([{ firstName, lastName, email, phoneNumber }])
+        .values([{ firstName, lastName, email, phoneNumber, location }])
         .execute()
 
       if (insertResult.raw.affectedRows !== 1) {
@@ -282,6 +283,7 @@ export class UserService implements IUserService {
     lastName,
     phoneNumber,
     status,
+    location,
     queryRunner
   }: IEditUser) => {
     let code: ResponseCode = ResponseCode.OK
@@ -297,6 +299,7 @@ export class UserService implements IUserService {
           firstName,
           lastName,
           phoneNumber,
+          location: location as string | undefined,
           status
         })
         .where('user.id = :userId', { userId })

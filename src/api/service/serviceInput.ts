@@ -1,122 +1,79 @@
 import { Request } from 'express'
 import Joi from 'joi'
 
-export const addServiceSchema = (req: Request) => {
+const uuidSchema = Joi.string().guid({ version: 'uuidv4' })
+
+const baseServiceBody = {
+  name: Joi.string().min(1).max(128),
+  description: Joi.string().allow('', null)
+}
+
+export const listServicesSchema = (req: Request) => {
+  const rawSearch = req.query.search
+  const rawPage = req.query.page
+  const rawLimit = req.query.limit
+
   return {
     schema: Joi.object()
       .keys({
-        email: Joi.string().min(6).max(255).trim().email().required(),
-        firstName: Joi.string().min(1).max(36).required(),
-        lastName: Joi.string().min(1).max(36).required(),
-        phoneNumber: Joi.string()
-          .regex(
-            /^(|([+]?[\s0-9]+)?(\d{3}|[(]?[0-9]+[)])?([-]?[\s]?[0-9]){3,24})$/
-          )
-          .allow(null)
+        search: Joi.string().allow('', null).optional(),
+        page: Joi.number().min(1).optional(),
+        limit: Joi.number().min(1).max(100).optional()
       })
       .options({ abortEarly: false }),
     input: {
-      email: req.body.email,
-      firstName: req.body.firstName,
-      lastName: req.body.lastName,
-      phoneNumber: req.body.phoneNumber
+      search: Array.isArray(rawSearch)
+        ? rawSearch[0]
+        : rawSearch === undefined
+        ? null
+        : rawSearch,
+      page: Array.isArray(rawPage) ? rawPage[0] : rawPage,
+      limit: Array.isArray(rawLimit) ? rawLimit[0] : rawLimit
     }
   }
 }
 
-export const getServicesSchema = (req: Request) => {
+export const createServiceSchema = (req: Request) => {
   return {
     schema: Joi.object()
       .keys({
-        search: Joi.string().min(1).allow(null).optional(),
-        page: Joi.number().min(1).required(),
-        limit: Joi.number().min(1).required()
+        ...baseServiceBody,
+        name: baseServiceBody.name.required()
       })
       .options({ abortEarly: false }),
     input: {
-      search: req.query.search,
-      page: req.query.page,
-      limit: req.query.limit
+      name: req.body.name,
+      description: req.body.description ?? null
     }
   }
 }
 
-export const deleteServiceSchema = (req: Request) => {
+export const updateServiceSchema = (req: Request) => {
   return {
     schema: Joi.object()
       .keys({
-        userId: Joi.string()
-          .regex(
-            /^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/
-          )
-          .required()
+        serviceId: uuidSchema.required(),
+        ...baseServiceBody
       })
+      .min(2)
       .options({ abortEarly: false }),
     input: {
-      userId: req.body.userId
+      serviceId: req.params.serviceId,
+      name: req.body.name,
+      description: req.body.description ?? null
     }
   }
 }
 
-export const bulkDeleteServiceSchema = (req: Request) => {
+export const serviceIdParamSchema = (req: Request) => {
   return {
     schema: Joi.object()
       .keys({
-        userIds: Joi.array()
-          .items(
-            Joi.string().regex(
-              /^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/
-            )
-          )
-          .required()
+        serviceId: uuidSchema.required()
       })
       .options({ abortEarly: false }),
     input: {
-      userIds: req.body.userIds
-    }
-  }
-}
-
-export const editServiceSchema = (req: Request) => {
-  return {
-    schema: Joi.object()
-      .keys({
-        userId: Joi.string()
-          .regex(
-            /^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/
-          )
-          .required(),
-        firstName: Joi.string().min(1).max(36).required(),
-        lastName: Joi.string().min(1).max(36).required(),
-        phoneNumber: Joi.string()
-          .regex(
-            /^(|([+]?[\s0-9]+)?(\d{3}|[(]?[0-9]+[)])?([-]?[\s]?[0-9]){3,24})$/
-          )
-          .allow(null)
-      })
-      .options({ abortEarly: false }),
-    input: {
-      userId: req.body.userId,
-      firstName: req.body.firstName,
-      lastName: req.body.lastName,
-      phoneNumber: req.body.phoneNumber
-    }
-  }
-}
-
-export const getServiceSchema = (req: Request) => {
-  return {
-    schema: Joi.object()
-      .keys({
-        userId: Joi.string()
-          .regex(
-            /^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/
-          )
-          .required()
-      })
-      .options({ abortEarly: false }),
-    input: {
-      userId: req.params.id
+      serviceId: req.params.serviceId
     }
   }
 }

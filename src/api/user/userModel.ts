@@ -8,6 +8,7 @@ import {
 } from 'typeorm'
 import { UserStatus } from './interface'
 import { UserRole } from '../user_role/userRoleModel'
+import { EventModel } from '../events/eventsModel'
 
 @Entity()
 export class User {
@@ -32,6 +33,9 @@ export class User {
   @Column({ type: 'varchar', length: 14, nullable: true })
   phoneNumber?: string | null
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  location?: string
+
   @Column({ type: 'enum', enum: UserStatus, default: UserStatus.CREATED })
   status!: UserStatus
 
@@ -50,6 +54,9 @@ export class User {
 
   @OneToMany(() => UserRole, (userRole) => userRole.user)
   userRoles!: UserRole[]
+
+  @OneToMany(() => EventModel, (event) => event.owner)
+  events!: EventModel[]
 
   constructor(
     firstName: string,

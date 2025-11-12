@@ -1,121 +1,98 @@
 import { NextFunction, Request, Response } from 'express'
-import { RoleType } from '../role/interface'
-import { IServicesLimited, IServicesPaginationLimited } from './interface'
-import { ServiceService } from './serviceService'
-import { UserService } from '../user/userService'
 import { autoInjectable } from 'tsyringe'
+import { ResponseCode } from '../../interface'
+import { ServicesService } from './serviceService'
 
 @autoInjectable()
-export class ServiceController {
-  private readonly userService: UserService
-  private readonly serviceService: ServiceService
+export class ServicesController {
+  private readonly servicesService: ServicesService
 
-  constructor(userService: UserService, serviceService: ServiceService) {
-    this.userService = userService
-    this.serviceService = serviceService
+  constructor(servicesService: ServicesService) {
+    this.servicesService = servicesService
   }
 
-  addService = async (req: Request, res: Response, next: NextFunction) => {
-    const { email, firstName, lastName, phoneNumber } = res.locals.input
-    const { id } = req.user
+  listServices = async (req: Request, res: Response, next: NextFunction) => {
+    const input = res.locals.input ?? {}
+    const { page, limit, search } = input
 
-    const { code: serviceCode } = await this.serviceService.createService({
-      firstName,
-      lastName,
-      email,
-      phoneNumber,
-      assignedById: id
-    })
+    const pageNumber = typeof page === 'number' ? page : undefined
+    const limitNumber = typeof limit === 'number' ? limit : undefined
+    const searchTerm = typeof search === 'string' ? search : null
 
-    return next({ code: serviceCode })
-  }
-
-  getServices = async (req: Request, res: Response, next: NextFunction) => {
-    const { search, page, limit } = res.locals.input
-
-    const { userData, code } = await this.userService.getUsers({
-      search,
-      page,
-      limit,
-      role: RoleType.SERVICE
-    })
-
-    if (userData) {
-      const usersLimited: IServicesLimited[] = userData.users.map((user) => {
-        return {
-          userId: user.id,
-          name: user.firstName + ' ' + user.lastName,
-          email: user.email,
-          phoneNumber: user.phoneNumber
-        }
+    const { services, pagination, code } =
+      await this.servicesService.listServices({
+        page: pageNumber,
+        limit: limitNumber,
+        search: searchTerm
       })
 
-      let servicesData: IServicesPaginationLimited = {
-        pagination: userData.pagination,
-        users: usersLimited
-      }
-
-      return next({ data: servicesData, code })
-    }
-
-    return next({ code })
-  }
-
-  getService = async (req: Request, res: Response, next: NextFunction) => {
-    const { userId } = res.locals.input
-
-    const { user, code } = await this.userService.getUserById({
-      userId,
-      allUsers: true,
-      role: RoleType.SERVICE
-    })
-    if (!user) {
+    if (!services || !pagination) {
       return next({ code })
     }
 
-    let service = {
-      userId: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      phoneNumber: user.phoneNumber
-    }
-
-    return next({ data: { service }, code })
+    return next({
+      data: {
+        services,
+        pagination
+      },
+      code
+    })
   }
 
-  editService = async (req: Request, res: Response, next: NextFunction) => {
-    const { userId, firstName, lastName, phoneNumber } = res.locals.input
+  getService = async (req: Request, res: Response, next: NextFunction) => {
+    const input = res.locals.input ?? {}
+    const { serviceId } = input
 
-    const { code } = await this.serviceService.editService({
-      userId,
-      firstName,
-      lastName,
-      phoneNumber
+    const { service, code } = await this.servicesService.getServiceById({
+      serviceId
     })
 
-    return next({ code })
+    if (!service) {
+      return next({ code })
+    }
+
+    return next({ data: service, code })
+  }
+
+  createService = async (req: Request, res: Response, next: NextFunction) => {
+    const input = res.locals.input ?? {}
+    const { name, description } = input
+
+    const { service, code } = await this.servicesService.createService({
+      name,
+      description
+    })
+
+    if (!service) {
+      return next({ code })
+    }
+
+    return next({ data: service, code })
+  }
+
+  updateService = async (req: Request, res: Response, next: NextFunction) => {
+    const input = res.locals.input ?? {}
+    const { serviceId, name, description } = input
+
+    const { service, code } = await this.servicesService.updateService({
+      serviceId,
+      name,
+      description
+    })
+
+    if (!service) {
+      return next({ code })
+    }
+
+    return next({ data: service, code })
   }
 
   deleteService = async (req: Request, res: Response, next: NextFunction) => {
-    const { userId } = res.locals.input
+    const input = res.locals.input ?? {}
+    const { serviceId } = input
 
-    const { code } = await this.serviceService.deleteService({
-      userId
-    })
-
-    return next({ code })
-  }
-
-  bulkDeleteServices = async (
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ) => {
-    const { userIds } = res.locals.input
-
-    const { code } = await this.serviceService.bulkDeleteServices({
-      userIds
+    const { code } = await this.servicesService.deleteService({
+      serviceId
     })
 
     return next({ code })

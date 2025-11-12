@@ -243,7 +243,8 @@ const definitions = {
       email: 'john.doe@email.com',
       firstName: 'John',
       lastName: 'Doe',
-      phoneNumber: null
+      phoneNumber: null,
+      location: '123 Main St, Anytown, USA'
     }
   },
   get_clients_response: {
@@ -277,7 +278,10 @@ const definitions = {
           firstName: 'John',
           lastName: 'Doe',
           email: 'john.doe@email.com',
-          phoneNumber: null
+          phoneNumber: null,
+          location: '123 Main St, Anytown, USA',
+          status: 'Active',
+          assignedBy: 'John Doe'
         }
       },
       code: 200000,
