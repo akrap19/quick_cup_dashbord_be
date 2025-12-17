@@ -56,11 +56,13 @@ export class ServicesController {
 
   createService = async (req: Request, res: Response, next: NextFunction) => {
     const input = res.locals.input ?? {}
-    const { name, description } = input
+    const { name, description, priceCalculationUnit, prices } = input
 
     const { service, code } = await this.servicesService.createService({
       name,
-      description
+      description,
+      priceCalculationUnit,
+      prices
     })
 
     if (!service) {
@@ -72,12 +74,14 @@ export class ServicesController {
 
   updateService = async (req: Request, res: Response, next: NextFunction) => {
     const input = res.locals.input ?? {}
-    const { serviceId, name, description } = input
+    const { serviceId, name, description, priceCalculationUnit, prices } = input
 
     const { service, code } = await this.servicesService.updateService({
       serviceId,
       name,
-      description
+      description,
+      priceCalculationUnit,
+      prices
     })
 
     if (!service) {
@@ -96,5 +100,15 @@ export class ServicesController {
     })
 
     return next({ code })
+  }
+
+  getAllServicePrices = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const { data, code } = await this.servicesService.getAllServicePrices()
+
+    return next({ data, code })
   }
 }

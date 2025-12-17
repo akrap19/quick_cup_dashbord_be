@@ -6,7 +6,8 @@ import {
   deleteClientSchema,
   bulkDeleteClientSchema,
   editClientSchema,
-  getClientSchema
+  getClientSchema,
+  getClientProductPricesSchema
 } from './clientInput'
 import { requireRole, requireToken } from '../../middleware/auth'
 import { RoleType } from '../role/interface'
@@ -62,4 +63,12 @@ clientRouter.put(
   requireRole([RoleType.ADMIN, RoleType.MASTER_ADMIN]),
   validate(editClientSchema),
   clientController.editClient
+)
+
+clientRouter.get(
+  '/:clientId/product-prices',
+  requireToken,
+  requireRole([RoleType.ADMIN, RoleType.MASTER_ADMIN]),
+  validate(getClientProductPricesSchema),
+  clientController.getAllClientProductPrices
 )

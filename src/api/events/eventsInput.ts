@@ -8,7 +8,9 @@ const baseEventBody = {
   description: Joi.string().allow('', null),
   startDate: Joi.date(),
   endDate: Joi.date().allow(null),
-  location: Joi.string().max(255).allow('', null)
+  location: Joi.string().max(255).allow('', null),
+  place: Joi.string().max(255).allow('', null),
+  street: Joi.string().max(255).allow('', null)
 }
 
 export const listEventsSchema = (req: Request) => {
@@ -52,7 +54,9 @@ export const createEventSchema = (req: Request) => {
       description: req.body.description ?? null,
       startDate: req.body.startDate,
       endDate: req.body.endDate ?? null,
-      location: req.body.location ?? null
+      location: req.body.location ?? null,
+      place: req.body.place ?? null,
+      street: req.body.street ?? null
     }
   }
 }
@@ -74,7 +78,9 @@ export const updateEventSchema = (req: Request) => {
       description: req.body.description ?? null,
       startDate: req.body.startDate,
       endDate: req.body.endDate ?? null,
-      location: req.body.location ?? null
+      location: req.body.location ?? null,
+      place: req.body.place ?? null,
+      street: req.body.street ?? null
     }
   }
 }

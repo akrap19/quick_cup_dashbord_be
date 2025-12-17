@@ -105,17 +105,49 @@ const paths = {
 const definitions = {
   create_order_body: {
     example: {
-      orderNumber: 'ORD-1001',
-      status: 'Pending',
       totalAmount: 49.99,
-      customerName: 'Jane Doe',
-      notes: 'Deliver before noon'
-    }
+      notes: 'Deliver before noon',
+      acquisitionType: 'buy',
+      customerId: 'uuid-here',
+      eventId: 'uuid-here',
+      location: '123 Main St',
+      place: 'Downtown',
+      street: 'Main Street',
+      contactPerson: 'John Doe',
+      contactPersonContact: 'john@example.com',
+      products: [
+        {
+          productId: 'uuid-here',
+          quantity: 2,
+          price: 25.99
+        }
+      ],
+      services: [
+        {
+          serviceId: 'uuid-here',
+          quantity: 1,
+          price: 15.0
+        }
+      ]
+    },
+    description:
+      'Order number is automatically generated in format: qc-ddmmyy0000001'
   },
   update_order_body: {
     example: {
       status: 'Completed',
-      totalAmount: 59.99
+      totalAmount: 59.99,
+      acquisitionType: 'rent',
+      location: '456 Oak Ave',
+      place: 'Uptown',
+      street: 'Oak Avenue',
+      products: [
+        {
+          productId: 'uuid-here',
+          quantity: 3,
+          price: 20.0
+        }
+      ]
     }
   }
 }

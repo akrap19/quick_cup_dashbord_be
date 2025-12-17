@@ -13,7 +13,27 @@ export const addClientSchema = (req: Request) => {
             /^(|([+]?[\s0-9]+)?(\d{3}|[(]?[0-9]+[)])?([-]?[\s]?[0-9]){3,24})$/
           )
           .allow(null),
-        location: Joi.string().min(1).max(255).allow(null)
+        location: Joi.string().min(1).max(255).allow(null),
+        productPrices: Joi.array()
+          .items(
+            Joi.object({
+              productId: Joi.string()
+                .regex(
+                  /^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/
+                )
+                .required(),
+              prices: Joi.array()
+                .items(
+                  Joi.object({
+                    minQuantity: Joi.number().integer().min(0).required(),
+                    maxQuantity: Joi.number().integer().min(0).allow(null).optional(),
+                    price: Joi.number().min(0).required()
+                  })
+                )
+                .required()
+            })
+          )
+          .optional()
       })
       .options({ abortEarly: false }),
     input: {
@@ -21,7 +41,8 @@ export const addClientSchema = (req: Request) => {
       firstName: req.body.firstName,
       lastName: req.body.lastName,
       phoneNumber: req.body.phoneNumber,
-      location: req.body.location
+      location: req.body.location,
+      productPrices: req.body.productPrices
     }
   }
 }
@@ -95,7 +116,27 @@ export const editClientSchema = (req: Request) => {
             /^(|([+]?[\s0-9]+)?(\d{3}|[(]?[0-9]+[)])?([-]?[\s]?[0-9]){3,24})$/
           )
           .allow(null),
-        location: Joi.string().min(1).max(255).allow(null)
+        location: Joi.string().min(1).max(255).allow(null),
+        productPrices: Joi.array()
+          .items(
+            Joi.object({
+              productId: Joi.string()
+                .regex(
+                  /^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/
+                )
+                .required(),
+              prices: Joi.array()
+                .items(
+                  Joi.object({
+                    minQuantity: Joi.number().integer().min(0).required(),
+                    maxQuantity: Joi.number().integer().min(0).allow(null).optional(),
+                    price: Joi.number().min(0).required()
+                  })
+                )
+                .required()
+            })
+          )
+          .optional()
       })
       .options({ abortEarly: false }),
     input: {
@@ -103,7 +144,8 @@ export const editClientSchema = (req: Request) => {
       firstName: req.body.firstName,
       lastName: req.body.lastName,
       phoneNumber: req.body.phoneNumber,
-      location: req.body.location
+      location: req.body.location,
+      productPrices: req.body.productPrices
     }
   }
 }
@@ -121,6 +163,23 @@ export const getClientSchema = (req: Request) => {
       .options({ abortEarly: false }),
     input: {
       userId: req.params.id
+    }
+  }
+}
+
+export const getClientProductPricesSchema = (req: Request) => {
+  return {
+    schema: Joi.object()
+      .keys({
+        clientId: Joi.string()
+          .regex(
+            /^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/
+          )
+          .required()
+      })
+      .options({ abortEarly: false }),
+    input: {
+      clientId: req.params.clientId
     }
   }
 }

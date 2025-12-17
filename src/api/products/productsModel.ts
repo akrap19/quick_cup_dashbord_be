@@ -3,9 +3,12 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
-  UpdateDateColumn
+  UpdateDateColumn,
+  OneToMany
 } from 'typeorm'
 import { AcquisitionType } from './interface'
+import { ProductMedia } from './productsMediaModel'
+import { ProductPrice } from './productPriceModel'
 
 @Entity()
 export class Product {
@@ -14,6 +17,21 @@ export class Product {
 
   @Column({ type: 'varchar', length: 128 })
   name!: string
+
+  @Column({ type: 'varchar', length: 128 })
+  size?: string
+
+  @Column({ type: 'varchar', length: 128 })
+  unit?: string
+
+  @Column({ type: 'int' })
+  quantityPerUnit?: number
+
+  @Column({ type: 'varchar', length: 128 })
+  transportationUnit?: string
+
+  @Column({ type: 'int' })
+  unitsPerTransportationUnit?: number
 
   @Column({ type: 'text', nullable: true })
   description?: string | null
@@ -24,6 +42,12 @@ export class Product {
     default: AcquisitionType.BUY
   })
   acquisitionType!: AcquisitionType
+
+  @OneToMany(() => ProductMedia, (productMedia) => productMedia.product)
+  images?: ProductMedia[]
+
+  @OneToMany(() => ProductPrice, (price) => price.product)
+  prices?: ProductPrice[]
 
   @CreateDateColumn({
     type: 'timestamp',

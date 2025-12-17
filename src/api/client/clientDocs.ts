@@ -9,7 +9,7 @@ const paths = {
   '/client': {
     post: {
       tags: ['Clients'],
-      description: 'Creates client or adds client role ',
+      description: 'Creates client or adds client role. Can optionally include product prices for the client.',
       requestBody: {
         content: {
           'application/json': {
@@ -85,7 +85,7 @@ const paths = {
     },
     put: {
       tags: ['Clients'],
-      description: 'Edit client ',
+      description: 'Edit client. Can optionally update product prices for the client (replaces all existing prices).',
       requestBody: {
         content: {
           'application/json': {
@@ -157,7 +157,7 @@ const paths = {
   '/client/{id}': {
     get: {
       tags: ['Clients'],
-      description: 'Get client',
+      description: 'Get client with product prices',
       parameters: [
         {
           in: 'path',
@@ -169,7 +169,7 @@ const paths = {
       ],
       responses: {
         '200': {
-          description: 'Successfully got client',
+          description: 'Successfully got client with product prices',
           content: {
             schema: {
               $ref: '#/definitions/get_client_response'
@@ -178,6 +178,39 @@ const paths = {
         },
         '404': {
           description: 'User not found',
+          content: {
+            schema: {
+              $ref: '#/definitions/user_not_found_response'
+            }
+          }
+        }
+      }
+    }
+  },
+  '/client/{clientId}/product-prices': {
+    get: {
+      tags: ['Clients'],
+      description: 'Get all product prices for a specific client',
+      parameters: [
+        {
+          in: 'path',
+          name: 'clientId',
+          type: 'string',
+          required: true,
+          description: 'Client ID'
+        }
+      ],
+      responses: {
+        '200': {
+          description: 'Successfully retrieved client product prices',
+          content: {
+            schema: {
+              $ref: '#/definitions/get_client_product_prices_response'
+            }
+          }
+        },
+        '404': {
+          description: 'Client not found',
           content: {
             schema: {
               $ref: '#/definitions/user_not_found_response'
@@ -244,7 +277,24 @@ const definitions = {
       firstName: 'John',
       lastName: 'Doe',
       phoneNumber: null,
-      location: '123 Main St, Anytown, USA'
+      location: '123 Main St, Anytown, USA',
+      productPrices: [
+        {
+          productId: '83d0de32-41a0-4474-b93b-78c8e96e31a6',
+          prices: [
+            {
+              minQuantity: 1,
+              maxQuantity: 10,
+              price: 25.50
+            },
+            {
+              minQuantity: 11,
+              maxQuantity: null,
+              price: 22.00
+            }
+          ]
+        }
+      ]
     }
   },
   get_clients_response: {
@@ -273,16 +323,30 @@ const definitions = {
   get_client_response: {
     example: {
       data: {
-        client: {
-          userId: '43969d61-3f62-4f3f-b8c4-10f3f26b4e51',
-          firstName: 'John',
-          lastName: 'Doe',
-          email: 'john.doe@email.com',
-          phoneNumber: null,
-          location: '123 Main St, Anytown, USA',
-          status: 'Active',
-          assignedBy: 'John Doe'
-        }
+        userId: '43969d61-3f62-4f3f-b8c4-10f3f26b4e51',
+        firstName: 'John',
+        lastName: 'Doe',
+        email: 'john.doe@email.com',
+        phoneNumber: null,
+        location: '123 Main St, Anytown, USA',
+        status: 'Active',
+        assignedBy: 'John Doe',
+        productPrices: [
+          {
+            productId: '83d0de32-41a0-4474-b93b-78c8e96e31a6',
+            productName: 'Product Name',
+            prices: [
+              {
+                id: 'price-id-1',
+                minQuantity: 1,
+                maxQuantity: 10,
+                price: 25.50,
+                createdAt: '2024-01-01T00:00:00.000Z',
+                updatedAt: '2024-01-01T00:00:00.000Z'
+              }
+            ]
+          }
+        ]
       },
       code: 200000,
       message: 'OK'
@@ -293,7 +357,55 @@ const definitions = {
       userId: '83d0de32-41a0-4474-b93b-78c8e96e31a6',
       firstName: 'John',
       lastName: 'Doe',
-      phoneNumber: '12345678'
+      phoneNumber: '12345678',
+      location: '123 Main St, Anytown, USA',
+      productPrices: [
+        {
+          productId: '83d0de32-41a0-4474-b93b-78c8e96e31a6',
+          prices: [
+            {
+              minQuantity: 1,
+              maxQuantity: 10,
+              price: 25.50
+            },
+            {
+              minQuantity: 11,
+              maxQuantity: null,
+              price: 22.00
+            }
+          ]
+        }
+      ]
+    }
+  },
+  get_client_product_prices_response: {
+    example: {
+      data: [
+        {
+          productId: '83d0de32-41a0-4474-b93b-78c8e96e31a6',
+          productName: 'Product Name',
+          prices: [
+            {
+              id: 'price-id-1',
+              minQuantity: 1,
+              maxQuantity: 10,
+              price: 25.50,
+              createdAt: '2024-01-01T00:00:00.000Z',
+              updatedAt: '2024-01-01T00:00:00.000Z'
+            },
+            {
+              id: 'price-id-2',
+              minQuantity: 11,
+              maxQuantity: null,
+              price: 22.00,
+              createdAt: '2024-01-01T00:00:00.000Z',
+              updatedAt: '2024-01-01T00:00:00.000Z'
+            }
+          ]
+        }
+      ],
+      code: 200000,
+      message: 'OK'
     }
   },
   delete_client_body: {

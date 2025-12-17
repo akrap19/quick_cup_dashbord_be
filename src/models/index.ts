@@ -6,9 +6,17 @@ import { VerificationUID } from '../api/verification_uid/verificationUIDModel'
 import { Media } from '../api/media/mediaModel'
 import { ApiKey } from '../api/auth/apiKeyModel'
 import { Product } from '../api/products/productsModel'
+import { ProductMedia } from '../api/products/productsMediaModel'
+import { ProductPrice } from '../api/products/productPriceModel'
+import { ProductServicePrice } from '../api/products/productServicePriceModel'
+import { ClientProductPrice } from '../api/client/clientProductPriceModel'
 import { ServiceModel } from '../api/service/serviceModel'
+import { ServicePrice } from '../api/service/servicePriceModel'
+import { ServiceLocationModel } from '../api/service_location/serviceLocationModel'
 import { EventModel } from '../api/events/eventsModel'
 import { Order } from '../api/orders/ordersModel'
+import { OrderProduct } from '../api/orders/orderProductModel'
+import { OrderService } from '../api/orders/orderServiceModel'
 
 export const models = [
   Role,
@@ -19,7 +27,15 @@ export const models = [
   Media,
   ApiKey,
   Product,
+  ProductMedia,
+  ProductPrice,
+  ProductServicePrice,
+  ClientProductPrice,
   Order,
+  OrderProduct,
+  OrderService,
   ServiceModel,
+  ServicePrice,
+  ServiceLocationModel,
   EventModel
 ]

@@ -2,6 +2,7 @@ import express from 'express'
 import { ServicesController } from './serviceController'
 import {
   createServiceSchema,
+  getAllServicePricesSchema,
   listServicesSchema,
   serviceIdParamSchema,
   updateServiceSchema
@@ -22,6 +23,14 @@ serviceRouter.get(
   requireRole(adminRoles),
   validate(listServicesSchema),
   servicesController.listServices
+)
+
+serviceRouter.get(
+  '/prices',
+  requireToken,
+  requireRole(adminRoles),
+  validate(getAllServicePricesSchema),
+  servicesController.getAllServicePrices
 )
 
 serviceRouter.get(

@@ -56,7 +56,7 @@ export class EventsController {
 
   createEvent = async (req: Request, res: Response, next: NextFunction) => {
     const input = res.locals.input ?? {}
-    const { userId, title, description, startDate, endDate, location } = input
+    const { userId, title, description, startDate, endDate, location, place, street } = input
 
     if (typeof userId !== 'string' || !title || !(startDate instanceof Date)) {
       return next({ code: ResponseCode.INVALID_INPUT })
@@ -68,7 +68,9 @@ export class EventsController {
       description,
       startDate,
       endDate,
-      location
+      location,
+      place,
+      street
     })
 
     if (!event) {
@@ -87,7 +89,9 @@ export class EventsController {
       description,
       startDate,
       endDate,
-      location
+      location,
+      place,
+      street
     } = input
 
     if (
@@ -97,6 +101,8 @@ export class EventsController {
         typeof startDate === 'undefined' &&
         typeof endDate === 'undefined' &&
         typeof location === 'undefined' &&
+        typeof place === 'undefined' &&
+        typeof street === 'undefined' &&
         typeof userId === 'undefined')
     ) {
       return next({ code: ResponseCode.INVALID_INPUT })
@@ -109,7 +115,9 @@ export class EventsController {
       description,
       startDate,
       endDate,
-      location
+      location,
+      place,
+      street
     })
 
     if (!event) {

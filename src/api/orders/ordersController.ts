@@ -58,7 +58,20 @@ export class OrdersController {
 
   createOrder = async (req: Request, res: Response, next: NextFunction) => {
     const input = res.locals.input ?? {}
-    const { orderNumber, status, totalAmount, customerName, notes } = input
+    const {
+      totalAmount,
+      notes,
+      acquisitionType,
+      customerId,
+      eventId,
+      location,
+      place,
+      street,
+      contactPerson,
+      contactPersonContact,
+      products,
+      services
+    } = input
 
     const numericAmount =
       typeof totalAmount === 'number'
@@ -67,21 +80,23 @@ export class OrdersController {
         ? Number(totalAmount)
         : undefined
 
-    if (
-      !orderNumber ||
-      !status ||
-      typeof numericAmount !== 'number' ||
-      Number.isNaN(numericAmount)
-    ) {
+    if (typeof numericAmount !== 'number' || Number.isNaN(numericAmount)) {
       return next({ code: ResponseCode.INVALID_INPUT })
     }
 
     const { order, code } = await this.ordersService.createOrder({
-      orderNumber,
-      status,
       totalAmount: numericAmount,
-      customerName,
-      notes
+      notes,
+      acquisitionType,
+      customerId,
+      eventId,
+      location,
+      place,
+      street,
+      contactPerson,
+      contactPersonContact,
+      products,
+      services
     })
 
     if (!order) {
@@ -93,8 +108,22 @@ export class OrdersController {
 
   updateOrder = async (req: Request, res: Response, next: NextFunction) => {
     const input = res.locals.input ?? {}
-    const { orderId, orderNumber, status, totalAmount, customerName, notes } =
-      input
+    const {
+      orderId,
+      status,
+      totalAmount,
+      notes,
+      acquisitionType,
+      customerId,
+      eventId,
+      location,
+      place,
+      street,
+      contactPerson,
+      contactPersonContact,
+      products,
+      services
+    } = input
 
     const numericAmount =
       typeof totalAmount === 'number'
@@ -105,22 +134,38 @@ export class OrdersController {
 
     if (
       typeof orderId !== 'string' ||
-      (typeof orderNumber === 'undefined' &&
-        typeof status === 'undefined' &&
+      (typeof status === 'undefined' &&
         typeof numericAmount === 'undefined' &&
-        typeof customerName === 'undefined' &&
-        typeof notes === 'undefined')
+        typeof notes === 'undefined' &&
+        typeof acquisitionType === 'undefined' &&
+        typeof customerId === 'undefined' &&
+        typeof eventId === 'undefined' &&
+        typeof location === 'undefined' &&
+        typeof place === 'undefined' &&
+        typeof street === 'undefined' &&
+        typeof contactPerson === 'undefined' &&
+        typeof contactPersonContact === 'undefined' &&
+        typeof products === 'undefined' &&
+        typeof services === 'undefined')
     ) {
       return next({ code: ResponseCode.INVALID_INPUT })
     }
 
     const { order, code } = await this.ordersService.updateOrder({
       orderId,
-      orderNumber,
       status,
       totalAmount: numericAmount,
-      customerName,
-      notes
+      notes,
+      acquisitionType,
+      customerId,
+      eventId,
+      location,
+      place,
+      street,
+      contactPerson,
+      contactPersonContact,
+      products,
+      services
     })
 
     if (!order) {

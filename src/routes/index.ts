@@ -7,6 +7,7 @@ import { userRouter } from '../api/user/userRouter'
 import { adminRouter } from '../api/admin/adminRouter'
 import { clientRouter } from '../api/client/clientRouter'
 import { serviceRouter } from '../api/service/serviceRouter'
+import { serviceLocationRouter } from '../api/service_location/serviceLocationRouter'
 import { mediaRouter } from '../api/media/mediaRouter'
 import { productsRouter } from '../api/products/productsRouter'
 import { eventsRouter } from '../api/events/eventsRouter'
@@ -21,6 +22,7 @@ router.use('/user', userRouter)
 router.use('/admin', adminRouter)
 router.use('/client', clientRouter)
 router.use('/services', serviceRouter)
+router.use('/service-locations', serviceLocationRouter)
 router.use('/media', mediaRouter)
 router.use('/products', productsRouter)
 router.use('/events', eventsRouter)

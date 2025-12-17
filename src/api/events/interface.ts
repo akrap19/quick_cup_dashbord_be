@@ -8,6 +8,8 @@ export interface ICreateEvent extends IServiceMethod {
   startDate: Date
   endDate?: Date | null
   location?: string | null
+  place?: string | null
+  street?: string | null
 }
 
 export interface IUpdateEvent extends IServiceMethod {
@@ -18,6 +20,8 @@ export interface IUpdateEvent extends IServiceMethod {
   startDate?: Date
   endDate?: Date | null
   location?: string | null
+  place?: string | null
+  street?: string | null
 }
 
 export interface IDeleteEvent extends IServiceMethod {

@@ -110,13 +110,17 @@ const definitions = {
       description: 'Annual summer event',
       startDate: '2025-07-01T10:00:00.000Z',
       endDate: '2025-07-01T18:00:00.000Z',
-      location: 'Central Park'
+      location: 'Central Park',
+      place: 'Manhattan',
+      street: 'Central Park West'
     }
   },
   update_event_body: {
     example: {
       title: 'Updated name',
-      location: 'Updated location'
+      location: 'Updated location',
+      place: 'Updated place',
+      street: 'Updated street'
     }
   }
 }

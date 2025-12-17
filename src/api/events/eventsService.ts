@@ -117,6 +117,8 @@ export class EventsService implements IEventService {
     startDate,
     endDate,
     location,
+    place,
+    street,
     queryRunner
   }: ICreateEvent) => {
     let code: ResponseCode = ResponseCode.OK
@@ -132,7 +134,9 @@ export class EventsService implements IEventService {
         description: description ?? null,
         startDate,
         endDate: endDate ?? null,
-        location: location ?? null
+        location: location ?? null,
+        place: place ?? null,
+        street: street ?? null
       })
 
       const savedEvent = await repository.save(event)
@@ -158,6 +162,8 @@ export class EventsService implements IEventService {
     startDate,
     endDate,
     location,
+    place,
+    street,
     queryRunner
   }: IUpdateEvent) => {
     let code: ResponseCode = ResponseCode.OK
@@ -187,6 +193,12 @@ export class EventsService implements IEventService {
       }
       if (typeof location !== 'undefined') {
         updateData.location = location ?? null
+      }
+      if (typeof place !== 'undefined') {
+        updateData.place = place ?? null
+      }
+      if (typeof street !== 'undefined') {
+        updateData.street = street ?? null
       }
 
       const result = await repository

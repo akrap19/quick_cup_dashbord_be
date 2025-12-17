@@ -9,7 +9,7 @@ import { AppDataSource } from '../../services/typeorm'
 import { logger } from '../../logger'
 import { getResponseMessage } from '../../services/utils'
 import { Media } from './mediaModel'
-import { deleteFile, getSignedURL, uploadFile } from '../../services/google'
+import { deleteFile, getFileURL, uploadFile } from '../../services/cpanel'
 import { Repository } from 'typeorm'
 import { autoInjectable } from 'tsyringe'
 import { generateUUID } from '../../services/uuid'
@@ -89,7 +89,7 @@ export class MediaService implements IMediaService {
       const mediaResponse = {
         id: media.id,
         name: media.name,
-        url: (await getSignedURL(media.url)) || media.url
+        url: (await getFileURL(media.url)) || media.url
       }
 
       return {
@@ -124,7 +124,7 @@ export class MediaService implements IMediaService {
       const mediaResponse = {
         id: media.id,
         name: media.name,
-        url: (await getSignedURL(media.url)) || media.url
+        url: (await getFileURL(media.url)) || media.url
       }
 
       return {

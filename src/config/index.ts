@@ -39,6 +39,12 @@ interface ENV {
   SMTP_PASS?: string
   SMTP_SECURE?: boolean
   SMTP_TLS_REJECT_UNAUTHORIZED?: boolean
+  SFTP_HOST?: string
+  SFTP_PORT?: number
+  SFTP_USERNAME?: string
+  SFTP_PASSWORD?: string
+  SFTP_UPLOAD_BASE_PATH?: string
+  SFTP_BASE_URL?: string
   GOOGLE_PLACES_API_KEY?: string
   GOOGLE_TRANSLATE_API_KEY?: string
   GOOGLE_SERVICE_ACCOUNT_KEY_LOCATION?: string
@@ -132,7 +138,13 @@ const getConfig = (): ENV => {
     AUDIO_FILE_SIZE_LIMIT: environmentNumber(process.env.AUDIO_FILE_SIZE_LIMIT),
     USE_UNIX_SOCKET: environmentBoolean(process.env.USE_UNIX_SOCKET),
     DEFAULT_CASE_PASSWORD: process.env.DEFAULT_CASE_PASSWORD,
-    DB_POOL_SIZE: environmentNumber(process.env.DB_POOL_SIZE)
+    DB_POOL_SIZE: environmentNumber(process.env.DB_POOL_SIZE),
+    SFTP_HOST: process.env.SFTP_HOST,
+    SFTP_PORT: environmentNumber(process.env.SFTP_PORT),
+    SFTP_USERNAME: process.env.SFTP_USERNAME,
+    SFTP_PASSWORD: process.env.SFTP_PASSWORD,
+    SFTP_UPLOAD_BASE_PATH: process.env.SFTP_UPLOAD_BASE_PATH,
+    SFTP_BASE_URL: process.env.SFTP_BASE_URL
   }
 }
 

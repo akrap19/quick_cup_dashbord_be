@@ -6,6 +6,7 @@ import { userDocs } from '../api/user/userDocs'
 import { adminDocs } from '../api/admin/adminDocs'
 import { clientDocs } from '../api/client/clientDocs'
 import { serviceDocs } from '../api/service/serviceDocs'
+import { serviceLocationDocs } from '../api/service_location/serviceLocationDocs'
 import { mediaDocs } from '../api/media/mediaDocs'
 import { productsDocs } from '../api/products/productsDocs'
 import { eventsDocs } from '../api/events/eventsDocs'
@@ -44,6 +45,7 @@ export const APIDocumentation = {
     adminDocs,
     clientDocs,
     serviceDocs,
+    serviceLocationDocs,
     authDocs,
     mediaDocs,
     productsDocs,

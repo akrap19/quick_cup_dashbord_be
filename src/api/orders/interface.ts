@@ -1,21 +1,49 @@
 import { AsyncResponse, IServiceMethod } from '../../interface'
+import { AcquisitionType } from '../products/interface'
 import { Order } from './ordersModel'
 
+export interface IOrderProductInput {
+  productId: string
+  quantity: number
+  price: number
+}
+
+export interface IOrderServiceInput {
+  serviceId: string
+  quantity: number
+  price: number
+}
+
 export interface ICreateOrder extends IServiceMethod {
-  orderNumber: string
-  status: string
   totalAmount: number
-  customerName?: string | null
   notes?: string | null
+  acquisitionType?: AcquisitionType
+  customerId?: string | null
+  eventId?: string | null
+  location?: string | null
+  place?: string | null
+  street?: string | null
+  contactPerson?: string | null
+  contactPersonContact?: string | null
+  products?: IOrderProductInput[]
+  services?: IOrderServiceInput[]
 }
 
 export interface IUpdateOrder extends IServiceMethod {
   orderId: string
-  orderNumber?: string
   status?: string
   totalAmount?: number
-  customerName?: string | null
   notes?: string | null
+  acquisitionType?: AcquisitionType
+  customerId?: string | null
+  eventId?: string | null
+  location?: string | null
+  place?: string | null
+  street?: string | null
+  contactPerson?: string | null
+  contactPersonContact?: string | null
+  products?: IOrderProductInput[]
+  services?: IOrderServiceInput[]
 }
 
 export interface IDeleteOrder extends IServiceMethod {

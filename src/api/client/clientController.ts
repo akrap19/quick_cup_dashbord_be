@@ -16,7 +16,7 @@ export class ClientController {
   }
 
   addClient = async (req: Request, res: Response, next: NextFunction) => {
-    const { email, firstName, lastName, phoneNumber, location } =
+    const { email, firstName, lastName, phoneNumber, location, productPrices } =
       res.locals.input
     const { id } = req.user
     const { user, code } = await this.userService.getUserById({
@@ -33,7 +33,8 @@ export class ClientController {
       email,
       phoneNumber,
       location,
-      assignedById: id
+      assignedById: id,
+      productPrices
     })
 
     return next({ code: clientCode })
@@ -85,6 +86,10 @@ export class ClientController {
       (userRole) => userRole.role.name == RoleType.CLIENT
     )
 
+    // Get client product prices
+    const { data: productPrices } =
+      await this.clientService.getAllClientProductPrices(userId)
+
     let clientData = {
       userId: user.id,
       firstName: user.firstName,
@@ -94,7 +99,8 @@ export class ClientController {
       location: user.location,
       status: user.status,
       assignedBy:
-        client?.assignedBy?.firstName + ' ' + client?.assignedBy?.lastName
+        client?.assignedBy?.firstName + ' ' + client?.assignedBy?.lastName,
+      productPrices: productPrices || []
     }
 
     return next({ data: clientData, code })
@@ -125,7 +131,7 @@ export class ClientController {
   }
 
   editClient = async (req: Request, res: Response, next: NextFunction) => {
-    const { userId, firstName, lastName, phoneNumber, location } =
+    const { userId, firstName, lastName, phoneNumber, location, productPrices } =
       res.locals.input
 
     const { code } = await this.clientService.editClient({
@@ -133,9 +139,24 @@ export class ClientController {
       firstName,
       lastName,
       phoneNumber,
-      location
+      location,
+      productPrices
     })
 
     return next({ code })
+  }
+
+  getAllClientProductPrices = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const { clientId } = res.locals.input
+
+    const { data, code } = await this.clientService.getAllClientProductPrices(
+      clientId
+    )
+
+    return next({ data, code })
   }
 }

@@ -3,8 +3,16 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
-  UpdateDateColumn
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  OneToMany
 } from 'typeorm'
+import { AcquisitionType } from '../products/interface'
+import { User } from '../user/userModel'
+import { EventModel } from '../events/eventsModel'
+import { OrderProduct } from './orderProductModel'
+import { OrderService } from './orderServiceModel'
 
 @Entity()
 export class Order {
@@ -25,6 +33,48 @@ export class Order {
 
   @Column({ type: 'text', nullable: true })
   notes?: string | null
+
+  @Column({
+    type: 'enum',
+    enum: AcquisitionType,
+    default: AcquisitionType.BUY
+  })
+  acquisitionType!: AcquisitionType
+
+  @Column({ type: 'uuid', nullable: true })
+  customerId?: string | null
+
+  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'customer_id' })
+  customer?: User | null
+
+  @Column({ type: 'uuid', nullable: true })
+  eventId?: string | null
+
+  @ManyToOne(() => EventModel, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'event_id' })
+  event?: EventModel | null
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  location?: string | null
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  place?: string | null
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  street?: string | null
+
+  @Column({ type: 'varchar', length: 128, nullable: true })
+  contactPerson?: string | null
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  contactPersonContact?: string | null
+
+  @OneToMany(() => OrderProduct, (orderProduct) => orderProduct.order)
+  products?: OrderProduct[]
+
+  @OneToMany(() => OrderService, (orderService) => orderService.order)
+  services?: OrderService[]
 
   @Column({
     type: 'timestamp',

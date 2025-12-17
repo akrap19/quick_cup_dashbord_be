@@ -1,14 +1,37 @@
 import { Request } from 'express'
 import Joi from 'joi'
+import { AcquisitionType } from '../products/interface'
 
 const uuidSchema = Joi.string().guid({ version: 'uuidv4' })
 
+const orderProductSchema = Joi.object({
+  productId: uuidSchema.required(),
+  quantity: Joi.number().integer().min(1).required(),
+  price: Joi.number().precision(4).positive().required()
+})
+
+const orderServiceSchema = Joi.object({
+  serviceId: uuidSchema.required(),
+  quantity: Joi.number().integer().min(1).required(),
+  price: Joi.number().precision(4).positive().required()
+})
+
 const baseOrderBody = {
-  orderNumber: Joi.string().min(1).max(64),
   status: Joi.string().min(1).max(64),
   totalAmount: Joi.number().precision(2).positive(),
-  customerName: Joi.string().max(128).allow('', null),
-  notes: Joi.string().allow('', null)
+  notes: Joi.string().allow('', null),
+  acquisitionType: Joi.string()
+    .valid(AcquisitionType.BUY, AcquisitionType.RENT)
+    .optional(),
+  customerId: uuidSchema.allow(null).optional(),
+  eventId: uuidSchema.allow(null).optional(),
+  location: Joi.string().max(255).allow('', null).optional(),
+  place: Joi.string().max(255).allow('', null).optional(),
+  street: Joi.string().max(255).allow('', null).optional(),
+  contactPerson: Joi.string().max(128).allow('', null).optional(),
+  contactPersonContact: Joi.string().max(255).allow('', null).optional(),
+  products: Joi.array().items(orderProductSchema).optional(),
+  services: Joi.array().items(orderServiceSchema).optional()
 }
 
 export const listOrdersSchema = (req: Request) => {
@@ -48,17 +71,22 @@ export const createOrderSchema = (req: Request) => {
     schema: Joi.object()
       .keys({
         ...baseOrderBody,
-        orderNumber: baseOrderBody.orderNumber.required(),
-        status: baseOrderBody.status.required(),
         totalAmount: baseOrderBody.totalAmount.required()
       })
       .options({ abortEarly: false }),
     input: {
-      orderNumber: req.body.orderNumber,
-      status: req.body.status,
       totalAmount: req.body.totalAmount,
-      customerName: req.body.customerName ?? null,
-      notes: req.body.notes ?? null
+      notes: req.body.notes ?? null,
+      acquisitionType: req.body.acquisitionType,
+      customerId: req.body.customerId ?? null,
+      eventId: req.body.eventId ?? null,
+      location: req.body.location ?? null,
+      place: req.body.place ?? null,
+      street: req.body.street ?? null,
+      contactPerson: req.body.contactPerson ?? null,
+      contactPersonContact: req.body.contactPersonContact ?? null,
+      products: req.body.products ?? [],
+      services: req.body.services ?? []
     }
   }
 }
@@ -74,11 +102,19 @@ export const updateOrderSchema = (req: Request) => {
       .options({ abortEarly: false }),
     input: {
       orderId: req.params.orderId,
-      orderNumber: req.body.orderNumber,
       status: req.body.status,
       totalAmount: req.body.totalAmount,
-      customerName: req.body.customerName ?? null,
-      notes: req.body.notes ?? null
+      notes: req.body.notes ?? null,
+      acquisitionType: req.body.acquisitionType,
+      customerId: req.body.customerId ?? null,
+      eventId: req.body.eventId ?? null,
+      location: req.body.location ?? null,
+      place: req.body.place ?? null,
+      street: req.body.street ?? null,
+      contactPerson: req.body.contactPerson ?? null,
+      contactPersonContact: req.body.contactPersonContact ?? null,
+      products: req.body.products,
+      services: req.body.services
     }
   }
 }

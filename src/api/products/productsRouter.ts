@@ -7,6 +7,8 @@ import { RoleType } from '../role/interface'
 import { ProductsController } from './productsController'
 import {
   createProductSchema,
+  getAllProductPricesSchema,
+  getAllProductServicePricesSchema,
   listProductsSchema,
   productIdParamSchema,
   updateProductSchema
@@ -23,6 +25,14 @@ productsRouter.get(
   requireRole(adminRoles),
   validate(listProductsSchema),
   productsController.listProducts
+)
+
+productsRouter.get(
+  '/prices',
+  requireToken,
+  requireRole(adminRoles),
+  validate(getAllProductPricesSchema),
+  productsController.getAllProductPrices
 )
 
 productsRouter.get(
@@ -55,4 +65,12 @@ productsRouter.delete(
   requireRole(adminRoles),
   validate(productIdParamSchema),
   productsController.deleteProduct
+)
+
+productsRouter.get(
+  '/:productId/service-prices',
+  requireToken,
+  requireRole(adminRoles),
+  validate(getAllProductServicePricesSchema),
+  productsController.getAllProductServicePrices
 )

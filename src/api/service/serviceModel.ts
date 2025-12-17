@@ -3,8 +3,16 @@ import {
   CreateDateColumn,
   Entity,
   PrimaryGeneratedColumn,
-  UpdateDateColumn
+  UpdateDateColumn,
+  OneToMany
 } from 'typeorm'
+import { ServicePrice } from './servicePriceModel'
+
+export enum PriceCalculationUnit {
+  PIECE = 'piece',
+  UNIT = 'unit',
+  TRANSPORTATION_UNIT = 'transportationUnit'
+}
 
 @Entity('service')
 export class ServiceModel {
@@ -16,6 +24,16 @@ export class ServiceModel {
 
   @Column({ type: 'text', nullable: true })
   description?: string | null
+
+  @Column({
+    type: 'enum',
+    enum: PriceCalculationUnit,
+    nullable: true
+  })
+  priceCalculationUnit?: PriceCalculationUnit | null
+
+  @OneToMany(() => ServicePrice, (price) => price.service)
+  prices?: ServicePrice[]
 
   @CreateDateColumn({
     type: 'timestamp',
@@ -30,8 +48,13 @@ export class ServiceModel {
   })
   updatedAt!: Date
 
-  constructor(name: string, description: string | null = null) {
+  constructor(
+    name: string,
+    description: string | null = null,
+    priceCalculationUnit: PriceCalculationUnit | null = null
+  ) {
     this.name = name
     this.description = description
+    this.priceCalculationUnit = priceCalculationUnit
   }
 }

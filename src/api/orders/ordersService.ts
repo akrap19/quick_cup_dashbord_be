@@ -5,6 +5,7 @@ import { AsyncResponse, ResponseCode } from '../../interface'
 import { AppDataSource } from '../../services/typeorm'
 import { logger } from '../../logger'
 import { getResponseMessage } from '../../services/utils'
+import { AcquisitionType } from '../products/interface'
 import {
   ICreateOrder,
   IDeleteOrder,
@@ -15,6 +16,8 @@ import {
   IUpdateOrder
 } from './interface'
 import { Order } from './ordersModel'
+import { OrderProduct } from './orderProductModel'
+import { OrderService } from './orderServiceModel'
 
 type ListOrdersResponse = Awaited<AsyncResponse<IOrdersPagination>>
 type OrderResponse = Awaited<AsyncResponse<Order>>
@@ -23,9 +26,66 @@ type DeleteOrderResponse = Awaited<AsyncResponse<null>>
 @autoInjectable()
 export class OrdersService implements IOrderService {
   private readonly orderRepository: Repository<Order>
+  private readonly orderProductRepository: Repository<OrderProduct>
+  private readonly orderServiceRepository: Repository<OrderService>
 
   constructor() {
     this.orderRepository = AppDataSource.manager.getRepository(Order)
+    this.orderProductRepository =
+      AppDataSource.manager.getRepository(OrderProduct)
+    this.orderServiceRepository =
+      AppDataSource.manager.getRepository(OrderService)
+  }
+
+  /**
+   * Generates an order number in format: qc-ddmmyy0000001
+   * Where ddmmyy is the current date and 0000001 is a 7-digit sequential number
+   */
+  private async generateOrderNumber(
+    manager = AppDataSource.manager
+  ): Promise<string> {
+    const now = new Date()
+    const day = String(now.getDate()).padStart(2, '0')
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const year = String(now.getFullYear()).slice(-2)
+    const datePrefix = `${day}${month}${year}`
+
+    // Get the start and end of today
+    const startOfDay = new Date(now)
+    startOfDay.setHours(0, 0, 0, 0)
+    const endOfDay = new Date(now)
+    endOfDay.setHours(23, 59, 59, 999)
+
+    const orderRepository = manager.getRepository(Order)
+
+    // Find the maximum sequential number for today
+    const orders = await orderRepository
+      .createQueryBuilder('order')
+      .where('order.createdAt >= :startOfDay', { startOfDay })
+      .andWhere('order.createdAt <= :endOfDay', { endOfDay })
+      .andWhere('order.orderNumber LIKE :pattern', {
+        pattern: `qc-${datePrefix}%`
+      })
+      .orderBy('order.orderNumber', 'DESC')
+      .limit(1)
+      .getOne()
+
+    let sequentialNumber = 1
+
+    if (orders && orders.orderNumber) {
+      // Extract the sequential number from the last order number
+      // Format: qc-ddmmyy0000001, so we need to extract the last 7 digits
+      const match = orders.orderNumber.match(/qc-\d{6}(\d{7})$/)
+      if (match) {
+        const lastNumber = parseInt(match[1], 10)
+        sequentialNumber = lastNumber + 1
+      }
+    }
+
+    // Generate sequential number with 7 digits, padded with zeros
+    const sequentialNumberStr = sequentialNumber.toString().padStart(7, '0')
+
+    return `qc-${datePrefix}${sequentialNumberStr}`
   }
 
   listOrders = async ({
@@ -53,15 +113,18 @@ export class OrdersService implements IOrderService {
 
       if (search) {
         const searchLike = `%${search.toLowerCase()}%`
-        query.andWhere(
-          'LOWER(order.orderNumber) LIKE :searchLike OR LOWER(order.customerName) LIKE :searchLike',
-          { searchLike }
-        )
+        query.andWhere('LOWER(order.orderNumber) LIKE :searchLike', {
+          searchLike
+        })
       }
 
       const offset = (currentPage - 1) * currentLimit
 
       const [orders, count] = await query
+        .leftJoinAndSelect('order.customer', 'customer')
+        .leftJoinAndSelect('order.event', 'event')
+        .leftJoinAndSelect('order.products', 'products')
+        .leftJoinAndSelect('order.services', 'services')
         .orderBy('order.placedAt', 'DESC')
         .skip(offset)
         .take(currentLimit)
@@ -101,7 +164,16 @@ export class OrdersService implements IOrderService {
         ? queryRunner.manager.getRepository(Order)
         : this.orderRepository
 
-      const order = await repository.findOne({ where: { id: orderId } })
+      const order = await repository
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.customer', 'customer')
+        .leftJoinAndSelect('order.event', 'event')
+        .leftJoinAndSelect('order.products', 'products')
+        .leftJoinAndSelect('products.product', 'product')
+        .leftJoinAndSelect('order.services', 'services')
+        .leftJoinAndSelect('services.service', 'service')
+        .where('order.id = :orderId', { orderId })
+        .getOne()
 
       if (!order) {
         return { code: ResponseCode.NOT_FOUND }
@@ -121,31 +193,91 @@ export class OrdersService implements IOrderService {
   }
 
   createOrder = async ({
-    orderNumber,
-    status,
     totalAmount,
-    customerName,
     notes,
+    acquisitionType,
+    customerId,
+    eventId,
+    location,
+    place,
+    street,
+    contactPerson,
+    contactPersonContact,
+    products,
+    services,
     queryRunner
   }: ICreateOrder): AsyncResponse<Order> => {
     let code: ResponseCode = ResponseCode.OK
 
     try {
-      const repository = queryRunner
-        ? queryRunner.manager.getRepository(Order)
-        : this.orderRepository
+      const manager = queryRunner ? queryRunner.manager : AppDataSource.manager
 
-      const order = repository.create({
+      const orderRepository = manager.getRepository(Order)
+      const orderProductRepository = manager.getRepository(OrderProduct)
+      const orderServiceRepository = manager.getRepository(OrderService)
+
+      // Generate order number automatically
+      const orderNumber = await this.generateOrderNumber(manager)
+
+      const order = orderRepository.create({
         orderNumber,
-        status,
+        status: 'Order Created',
         totalAmount,
-        customerName: customerName ?? null,
-        notes: notes ?? null
+        notes: notes ?? null,
+        acquisitionType: acquisitionType ?? AcquisitionType.BUY,
+        customerId: customerId ?? null,
+        eventId: eventId ?? null,
+        location: location ?? null,
+        place: place ?? null,
+        street: street ?? null,
+        contactPerson: contactPerson ?? null,
+        contactPersonContact: contactPersonContact ?? null
       })
 
-      const savedOrder = await repository.save(order)
+      const savedOrder = await orderRepository.save(order)
 
-      return { order: savedOrder, code } as unknown as OrderResponse
+      // Create order products
+      if (products && products.length > 0) {
+        const orderProducts = products.map((product) =>
+          orderProductRepository.create({
+            orderId: savedOrder.id,
+            productId: product.productId,
+            quantity: product.quantity,
+            price: product.price
+          })
+        )
+        await orderProductRepository.save(orderProducts)
+      }
+
+      // Create order services
+      if (services && services.length > 0) {
+        const orderServices = services.map((service) =>
+          orderServiceRepository.create({
+            orderId: savedOrder.id,
+            serviceId: service.serviceId,
+            quantity: service.quantity,
+            price: service.price
+          })
+        )
+        await orderServiceRepository.save(orderServices)
+      }
+
+      // Reload order with relationships
+      const orderWithRelations = await orderRepository
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.customer', 'customer')
+        .leftJoinAndSelect('order.event', 'event')
+        .leftJoinAndSelect('order.products', 'products')
+        .leftJoinAndSelect('products.product', 'product')
+        .leftJoinAndSelect('order.services', 'services')
+        .leftJoinAndSelect('services.service', 'service')
+        .where('order.id = :orderId', { orderId: savedOrder.id })
+        .getOne()
+
+      return {
+        order: orderWithRelations || savedOrder,
+        code
+      } as unknown as OrderResponse
     } catch (err: any) {
       code = ResponseCode.SERVER_ERROR
       logger.error({
@@ -160,49 +292,124 @@ export class OrdersService implements IOrderService {
 
   updateOrder = async ({
     orderId,
-    orderNumber,
     status,
     totalAmount,
-    customerName,
     notes,
+    acquisitionType,
+    customerId,
+    eventId,
+    location,
+    place,
+    street,
+    contactPerson,
+    contactPersonContact,
+    products,
+    services,
     queryRunner
   }: IUpdateOrder): AsyncResponse<Order> => {
     let code: ResponseCode = ResponseCode.OK
 
     try {
-      const repository = queryRunner
-        ? queryRunner.manager.getRepository(Order)
-        : this.orderRepository
+      const manager = queryRunner ? queryRunner.manager : AppDataSource.manager
+
+      const orderRepository = manager.getRepository(Order)
+      const orderProductRepository = manager.getRepository(OrderProduct)
+      const orderServiceRepository = manager.getRepository(OrderService)
+
+      // Check if order exists
+      const existingOrder = await orderRepository.findOne({
+        where: { id: orderId }
+      })
+
+      if (!existingOrder) {
+        return { code: ResponseCode.NOT_FOUND }
+      }
 
       const updateData: Partial<Order> = {}
 
-      if (typeof orderNumber !== 'undefined') {
-        updateData.orderNumber = orderNumber
-      }
+      // Order number is immutable and cannot be updated
       if (typeof status !== 'undefined') {
         updateData.status = status
       }
       if (typeof totalAmount !== 'undefined') {
         updateData.totalAmount = totalAmount
       }
-      if (typeof customerName !== 'undefined') {
-        updateData.customerName = customerName ?? null
-      }
       if (typeof notes !== 'undefined') {
         updateData.notes = notes ?? null
       }
-
-      const result = await repository
-        .createQueryBuilder()
-        .update(Order)
-        .set(updateData)
-        .where('id = :orderId', { orderId })
-        .execute()
-
-      if (!result.affected) {
-        return { code: ResponseCode.NOT_FOUND }
+      if (typeof acquisitionType !== 'undefined') {
+        updateData.acquisitionType = acquisitionType
+      }
+      if (typeof customerId !== 'undefined') {
+        updateData.customerId = customerId ?? null
+      }
+      if (typeof eventId !== 'undefined') {
+        updateData.eventId = eventId ?? null
+      }
+      if (typeof location !== 'undefined') {
+        updateData.location = location ?? null
+      }
+      if (typeof place !== 'undefined') {
+        updateData.place = place ?? null
+      }
+      if (typeof street !== 'undefined') {
+        updateData.street = street ?? null
+      }
+      if (typeof contactPerson !== 'undefined') {
+        updateData.contactPerson = contactPerson ?? null
+      }
+      if (typeof contactPersonContact !== 'undefined') {
+        updateData.contactPersonContact = contactPersonContact ?? null
       }
 
+      if (Object.keys(updateData).length > 0) {
+        await orderRepository
+          .createQueryBuilder()
+          .update(Order)
+          .set(updateData)
+          .where('id = :orderId', { orderId })
+          .execute()
+      }
+
+      // Update products if provided
+      if (typeof products !== 'undefined') {
+        // Delete existing products
+        await orderProductRepository.delete({ orderId })
+
+        // Create new products
+        if (products && products.length > 0) {
+          const orderProducts = products.map((product) =>
+            orderProductRepository.create({
+              orderId,
+              productId: product.productId,
+              quantity: product.quantity,
+              price: product.price
+            })
+          )
+          await orderProductRepository.save(orderProducts)
+        }
+      }
+
+      // Update services if provided
+      if (typeof services !== 'undefined') {
+        // Delete existing services
+        await orderServiceRepository.delete({ orderId })
+
+        // Create new services
+        if (services && services.length > 0) {
+          const orderServices = services.map((service) =>
+            orderServiceRepository.create({
+              orderId,
+              serviceId: service.serviceId,
+              quantity: service.quantity,
+              price: service.price
+            })
+          )
+          await orderServiceRepository.save(orderServices)
+        }
+      }
+
+      // Reload order with relationships
       const { order, code: getCode } = await this.getOrderById({
         orderId,
         queryRunner

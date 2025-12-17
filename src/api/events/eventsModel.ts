@@ -29,6 +29,12 @@ export class EventModel {
   @Column({ type: 'varchar', length: 255, nullable: true })
   location?: string | null
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  place?: string | null
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  street?: string | null
+
   @ManyToOne(() => User, (user) => user.events, {
     onDelete: 'CASCADE'
   })
@@ -56,12 +62,16 @@ export class EventModel {
     description: string | null = null,
     startDate: Date,
     endDate: Date | null = null,
-    location: string | null = null
+    location: string | null = null,
+    place: string | null = null,
+    street: string | null = null
   ) {
     this.title = title
     this.description = description
     this.startDate = startDate
     this.endDate = endDate
     this.location = location
+    this.place = place
+    this.street = street
   }
 }

@@ -58,12 +58,32 @@ export class ProductsController {
 
   createProduct = async (req: Request, res: Response, next: NextFunction) => {
     const input = res.locals.input ?? {}
-    const { name, description, acquisitionType } = input
+    const {
+      name,
+      size,
+      unit,
+      quantityPerUnit,
+      transportationUnit,
+      unitsPerTransportationUnit,
+      description,
+      acquisitionType,
+      imageIds,
+      prices,
+      servicePrices
+    } = input
 
     const { product, code } = await this.productsService.createProduct({
       name,
+      size,
+      unit,
+      quantityPerUnit,
+      transportationUnit,
+      unitsPerTransportationUnit,
       description,
-      acquisitionType
+      acquisitionType,
+      imageIds,
+      prices,
+      servicePrices
     })
 
     if (!product) {
@@ -75,13 +95,36 @@ export class ProductsController {
 
   updateProduct = async (req: Request, res: Response, next: NextFunction) => {
     const input = res.locals.input ?? {}
-    const { productId, name, description, acquisitionType } = input
+    const {
+      productId,
+      name,
+      size,
+      unit,
+      quantityPerUnit,
+      transportationUnit,
+      unitsPerTransportationUnit,
+      description,
+      acquisitionType,
+      imageIdsToAdd,
+      imageIdsToRemove,
+      prices,
+      servicePrices
+    } = input
 
     const { product, code } = await this.productsService.updateProduct({
       productId,
       name,
+      size,
+      unit,
+      quantityPerUnit,
+      transportationUnit,
+      unitsPerTransportationUnit,
       description,
-      acquisitionType
+      acquisitionType,
+      imageIdsToAdd,
+      imageIdsToRemove,
+      prices,
+      servicePrices
     })
 
     if (!product) {
@@ -100,5 +143,34 @@ export class ProductsController {
     })
 
     return next({ code })
+  }
+
+  getAllProductPrices = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const input = res.locals.input ?? {}
+    const { acquisitionType } = input
+
+    const { data, code } = await this.productsService.getAllProductPrices({
+      acquisitionType
+    })
+
+    return next({ data, code })
+  }
+
+  getAllProductServicePrices = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const input = res.locals.input ?? {}
+    const { productId } = input
+
+    const { data, code } =
+      await this.productsService.getAllProductServicePrices(productId)
+
+    return next({ data, code })
   }
 }

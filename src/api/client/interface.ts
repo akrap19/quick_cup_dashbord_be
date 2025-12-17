@@ -7,6 +7,14 @@ export interface IEditUser {
   lastName: string
   phoneNumber: string
   location: string
+  productPrices?: Array<{
+    productId: string
+    prices: Array<{
+      minQuantity: number
+      maxQuantity?: number | null
+      price: number
+    }>
+  }>
 }
 
 interface IUsersPagination {
@@ -39,6 +47,14 @@ export interface ICreateClient {
   phoneNumber?: string
   location: string
   assignedById: string
+  productPrices?: Array<{
+    productId: string
+    prices: Array<{
+      minQuantity: number
+      maxQuantity?: number | null
+      price: number
+    }>
+  }>
 }
 
 export interface IClientService {
