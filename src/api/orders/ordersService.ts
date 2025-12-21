@@ -5,7 +5,9 @@ import { AsyncResponse, ResponseCode } from '../../interface'
 import { AppDataSource } from '../../services/typeorm'
 import { logger } from '../../logger'
 import { getResponseMessage } from '../../services/utils'
+import { getFileURL } from '../../services/cpanel'
 import { AcquisitionType } from '../products/interface'
+import { ProductMedia } from '../products/productsMediaModel'
 import {
   ICreateOrder,
   IDeleteOrder,
@@ -13,11 +15,16 @@ import {
   IListOrders,
   IOrderService,
   IOrdersPagination,
-  IUpdateOrder
+  IUpdateOrder,
+  IUpdateOrderStatus
 } from './interface'
 import { Order } from './ordersModel'
 import { OrderProduct } from './orderProductModel'
 import { OrderService } from './orderServiceModel'
+import { OrderAdditionalCost } from './orderAdditionalCostModel'
+import { AdditionalCost } from '../additional_costs/additionalCostModel'
+import { BillingType } from '../additional_costs/interface'
+import { OrderStatus, getStatusDescription } from './orderStatus'
 
 type ListOrdersResponse = Awaited<AsyncResponse<IOrdersPagination>>
 type OrderResponse = Awaited<AsyncResponse<Order>>
@@ -28,6 +35,7 @@ export class OrdersService implements IOrderService {
   private readonly orderRepository: Repository<Order>
   private readonly orderProductRepository: Repository<OrderProduct>
   private readonly orderServiceRepository: Repository<OrderService>
+  private readonly orderAdditionalCostRepository: Repository<OrderAdditionalCost>
 
   constructor() {
     this.orderRepository = AppDataSource.manager.getRepository(Order)
@@ -35,12 +43,10 @@ export class OrdersService implements IOrderService {
       AppDataSource.manager.getRepository(OrderProduct)
     this.orderServiceRepository =
       AppDataSource.manager.getRepository(OrderService)
+    this.orderAdditionalCostRepository =
+      AppDataSource.manager.getRepository(OrderAdditionalCost)
   }
 
-  /**
-   * Generates an order number in format: qc-ddmmyy0000001
-   * Where ddmmyy is the current date and 0000001 is a 7-digit sequential number
-   */
   private async generateOrderNumber(
     manager = AppDataSource.manager
   ): Promise<string> {
@@ -49,40 +55,9 @@ export class OrdersService implements IOrderService {
     const month = String(now.getMonth() + 1).padStart(2, '0')
     const year = String(now.getFullYear()).slice(-2)
     const datePrefix = `${day}${month}${year}`
-
-    // Get the start and end of today
-    const startOfDay = new Date(now)
-    startOfDay.setHours(0, 0, 0, 0)
-    const endOfDay = new Date(now)
-    endOfDay.setHours(23, 59, 59, 999)
-
     const orderRepository = manager.getRepository(Order)
-
-    // Find the maximum sequential number for today
-    const orders = await orderRepository
-      .createQueryBuilder('order')
-      .where('order.createdAt >= :startOfDay', { startOfDay })
-      .andWhere('order.createdAt <= :endOfDay', { endOfDay })
-      .andWhere('order.orderNumber LIKE :pattern', {
-        pattern: `qc-${datePrefix}%`
-      })
-      .orderBy('order.orderNumber', 'DESC')
-      .limit(1)
-      .getOne()
-
-    let sequentialNumber = 1
-
-    if (orders && orders.orderNumber) {
-      // Extract the sequential number from the last order number
-      // Format: qc-ddmmyy0000001, so we need to extract the last 7 digits
-      const match = orders.orderNumber.match(/qc-\d{6}(\d{7})$/)
-      if (match) {
-        const lastNumber = parseInt(match[1], 10)
-        sequentialNumber = lastNumber + 1
-      }
-    }
-
-    // Generate sequential number with 7 digits, padded with zeros
+    const totalOrders = await orderRepository.count()
+    const sequentialNumber = totalOrders + 1
     const sequentialNumberStr = sequentialNumber.toString().padStart(7, '0')
 
     return `qc-${datePrefix}${sequentialNumberStr}`
@@ -93,6 +68,7 @@ export class OrdersService implements IOrderService {
     page = 1,
     limit = 25,
     status,
+    customerId,
     queryRunner
   }: IListOrders): AsyncResponse<IOrdersPagination> => {
     let code: ResponseCode = ResponseCode.OK
@@ -111,6 +87,10 @@ export class OrdersService implements IOrderService {
         query.andWhere('order.status = :status', { status })
       }
 
+      if (customerId) {
+        query.andWhere('order.customerId = :customerId', { customerId })
+      }
+
       if (search) {
         const searchLike = `%${search.toLowerCase()}%`
         query.andWhere('LOWER(order.orderNumber) LIKE :searchLike', {
@@ -125,13 +105,31 @@ export class OrdersService implements IOrderService {
         .leftJoinAndSelect('order.event', 'event')
         .leftJoinAndSelect('order.products', 'products')
         .leftJoinAndSelect('order.services', 'services')
+        .leftJoinAndSelect('order.additionalCosts', 'additionalCosts')
+        .leftJoinAndSelect('additionalCosts.additionalCost', 'additionalCost')
         .orderBy('order.placedAt', 'DESC')
         .skip(offset)
         .take(currentLimit)
         .getManyAndCount()
 
+      // Enrich orders with status descriptions
+      const enrichedOrders = orders.map((order) => {
+        const statusDesc = getStatusDescription(order.status)
+        return {
+          ...order,
+          statusInfo: statusDesc
+            ? {
+                title: statusDesc.title,
+                description: statusDesc.description,
+                customerMessage: statusDesc.customerMessage,
+                adminMessage: statusDesc.adminMessage
+              }
+            : null
+        }
+      })
+
       const response = {
-        orders,
+        orders: enrichedOrders,
         pagination: {
           count,
           page: currentPage,
@@ -155,6 +153,7 @@ export class OrdersService implements IOrderService {
 
   getOrderById = async ({
     orderId,
+    customerId,
     queryRunner
   }: IGetOrderById): AsyncResponse<Order> => {
     let code: ResponseCode = ResponseCode.OK
@@ -164,22 +163,69 @@ export class OrdersService implements IOrderService {
         ? queryRunner.manager.getRepository(Order)
         : this.orderRepository
 
-      const order = await repository
+      const query = repository
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.customer', 'customer')
         .leftJoinAndSelect('order.event', 'event')
         .leftJoinAndSelect('order.products', 'products')
         .leftJoinAndSelect('products.product', 'product')
+        .leftJoinAndSelect('product.images', 'productImages')
+        .leftJoinAndSelect('productImages.media', 'productMedia')
         .leftJoinAndSelect('order.services', 'services')
         .leftJoinAndSelect('services.service', 'service')
+        .leftJoinAndSelect('order.additionalCosts', 'additionalCosts')
+        .leftJoinAndSelect('additionalCosts.additionalCost', 'additionalCost')
         .where('order.id = :orderId', { orderId })
-        .getOne()
+
+      if (customerId) {
+        query.andWhere('order.customerId = :customerId', { customerId })
+      }
+
+      const order = await query.getOne()
 
       if (!order) {
         return { code: ResponseCode.NOT_FOUND }
       }
 
-      return { order, code } as unknown as OrderResponse
+      // Transform product images to include URLs (like in getProductById)
+      if (order.products && order.products.length > 0) {
+        await Promise.all(
+          order.products.map(async (orderProduct) => {
+            if (orderProduct.product && orderProduct.product.images) {
+              const images = await Promise.all(
+                orderProduct.product.images.map(async (img: ProductMedia) => {
+                  const url = await getFileURL(img.media.url)
+                  return {
+                    id: img.id,
+                    mediaId: img.media.id,
+                    name: img.media.name,
+                    url: url || img.media.url,
+                    createdAt: img.createdAt
+                  }
+                })
+              )
+              // Mutate the product images in place
+              ;(orderProduct.product as any).images = images
+            }
+          })
+        )
+      }
+
+      // Enrich order with status description
+      const statusDesc = getStatusDescription(order.status)
+      const enrichedOrder = {
+        ...order,
+        statusInfo: statusDesc
+          ? {
+              title: statusDesc.title,
+              description: statusDesc.description,
+              customerMessage: statusDesc.customerMessage,
+              adminMessage: statusDesc.adminMessage
+            }
+          : null
+      }
+
+      return { order: enrichedOrder, code } as unknown as OrderResponse
     } catch (err: any) {
       code = ResponseCode.SERVER_ERROR
       logger.error({
@@ -205,6 +251,7 @@ export class OrdersService implements IOrderService {
     contactPersonContact,
     products,
     services,
+    additionalCosts,
     queryRunner
   }: ICreateOrder): AsyncResponse<Order> => {
     let code: ResponseCode = ResponseCode.OK
@@ -215,13 +262,16 @@ export class OrdersService implements IOrderService {
       const orderRepository = manager.getRepository(Order)
       const orderProductRepository = manager.getRepository(OrderProduct)
       const orderServiceRepository = manager.getRepository(OrderService)
+      const orderAdditionalCostRepository =
+        manager.getRepository(OrderAdditionalCost)
+      const additionalCostRepository = manager.getRepository(AdditionalCost)
 
       // Generate order number automatically
       const orderNumber = await this.generateOrderNumber(manager)
 
       const order = orderRepository.create({
         orderNumber,
-        status: 'Order Created',
+        status: OrderStatus.PENDING,
         totalAmount,
         notes: notes ?? null,
         acquisitionType: acquisitionType ?? AcquisitionType.BUY,
@@ -262,6 +312,48 @@ export class OrdersService implements IOrderService {
         await orderServiceRepository.save(orderServices)
       }
 
+      // Create order additional costs
+      if (additionalCosts && additionalCosts.length > 0) {
+        const orderAdditionalCostsData = await Promise.all(
+          additionalCosts.map(async (additionalCost) => {
+            // Fetch the additional cost to check billing type
+            const additionalCostEntity = await additionalCostRepository.findOne(
+              {
+                where: { id: additionalCost.additionalCostId }
+              }
+            )
+
+            if (!additionalCostEntity) {
+              throw new Error(
+                `Additional cost with id ${additionalCost.additionalCostId} not found`
+              )
+            }
+
+            // Quantity is required for "by_piece" billing type, optional/null for "one_time"
+            let quantity: number | null = null
+            if (additionalCostEntity.billingType === BillingType.BY_PIECE) {
+              if (
+                typeof additionalCost.quantity === 'undefined' ||
+                additionalCost.quantity === null
+              ) {
+                throw new Error(
+                  `Quantity is required for additional cost with billing type "by_piece"`
+                )
+              }
+              quantity = additionalCost.quantity
+            }
+
+            return orderAdditionalCostRepository.create({
+              orderId: savedOrder.id,
+              additionalCostId: additionalCost.additionalCostId,
+              price: additionalCost.price,
+              quantity
+            })
+          })
+        )
+        await orderAdditionalCostRepository.save(orderAdditionalCostsData)
+      }
+
       // Reload order with relationships
       const orderWithRelations = await orderRepository
         .createQueryBuilder('order')
@@ -269,13 +361,63 @@ export class OrdersService implements IOrderService {
         .leftJoinAndSelect('order.event', 'event')
         .leftJoinAndSelect('order.products', 'products')
         .leftJoinAndSelect('products.product', 'product')
+        .leftJoinAndSelect('product.images', 'productImages')
+        .leftJoinAndSelect('productImages.media', 'productMedia')
         .leftJoinAndSelect('order.services', 'services')
         .leftJoinAndSelect('services.service', 'service')
         .where('order.id = :orderId', { orderId: savedOrder.id })
         .getOne()
 
+      if (!orderWithRelations) {
+        return {
+          order: savedOrder,
+          code
+        } as unknown as OrderResponse
+      }
+
+      // Transform product images to include URLs (like in getProductById)
+      if (
+        orderWithRelations.products &&
+        orderWithRelations.products.length > 0
+      ) {
+        await Promise.all(
+          orderWithRelations.products.map(async (orderProduct) => {
+            if (orderProduct.product && orderProduct.product.images) {
+              const images = await Promise.all(
+                orderProduct.product.images.map(async (img: ProductMedia) => {
+                  const url = await getFileURL(img.media.url)
+                  return {
+                    id: img.id,
+                    mediaId: img.media.id,
+                    name: img.media.name,
+                    url: url || img.media.url,
+                    createdAt: img.createdAt
+                  }
+                })
+              )
+              // Mutate the product images in place
+              ;(orderProduct.product as any).images = images
+            }
+          })
+        )
+      }
+
+      // Enrich order with status description
+      const statusDesc = getStatusDescription(orderWithRelations.status)
+      const enrichedOrder = {
+        ...orderWithRelations,
+        statusInfo: statusDesc
+          ? {
+              title: statusDesc.title,
+              description: statusDesc.description,
+              customerMessage: statusDesc.customerMessage,
+              adminMessage: statusDesc.adminMessage
+            }
+          : null
+      }
+
       return {
-        order: orderWithRelations || savedOrder,
+        order: enrichedOrder,
         code
       } as unknown as OrderResponse
     } catch (err: any) {
@@ -305,6 +447,7 @@ export class OrdersService implements IOrderService {
     contactPersonContact,
     products,
     services,
+    additionalCosts,
     queryRunner
   }: IUpdateOrder): AsyncResponse<Order> => {
     let code: ResponseCode = ResponseCode.OK
@@ -315,6 +458,9 @@ export class OrdersService implements IOrderService {
       const orderRepository = manager.getRepository(Order)
       const orderProductRepository = manager.getRepository(OrderProduct)
       const orderServiceRepository = manager.getRepository(OrderService)
+      const orderAdditionalCostRepository =
+        manager.getRepository(OrderAdditionalCost)
+      const additionalCostRepository = manager.getRepository(AdditionalCost)
 
       // Check if order exists
       const existingOrder = await orderRepository.findOne({
@@ -409,6 +555,53 @@ export class OrdersService implements IOrderService {
         }
       }
 
+      // Update additional costs if provided
+      if (typeof additionalCosts !== 'undefined') {
+        // Delete existing additional costs
+        await orderAdditionalCostRepository.delete({ orderId })
+
+        // Create new additional costs
+        if (additionalCosts && additionalCosts.length > 0) {
+          const orderAdditionalCostsData = await Promise.all(
+            additionalCosts.map(async (additionalCost) => {
+              // Fetch the additional cost to check billing type
+              const additionalCostEntity =
+                await additionalCostRepository.findOne({
+                  where: { id: additionalCost.additionalCostId }
+                })
+
+              if (!additionalCostEntity) {
+                throw new Error(
+                  `Additional cost with id ${additionalCost.additionalCostId} not found`
+                )
+              }
+
+              // Quantity is required for "by_piece" billing type, optional/null for "one_time"
+              let quantity: number | null = null
+              if (additionalCostEntity.billingType === BillingType.BY_PIECE) {
+                if (
+                  typeof additionalCost.quantity === 'undefined' ||
+                  additionalCost.quantity === null
+                ) {
+                  throw new Error(
+                    `Quantity is required for additional cost with billing type "by_piece"`
+                  )
+                }
+                quantity = additionalCost.quantity
+              }
+
+              return orderAdditionalCostRepository.create({
+                orderId,
+                additionalCostId: additionalCost.additionalCostId,
+                price: additionalCost.price,
+                quantity
+              })
+            })
+          )
+          await orderAdditionalCostRepository.save(orderAdditionalCostsData)
+        }
+      }
+
       // Reload order with relationships
       const { order, code: getCode } = await this.getOrderById({
         orderId,
@@ -460,5 +653,56 @@ export class OrdersService implements IOrderService {
     }
 
     return { code } as unknown as DeleteOrderResponse
+  }
+
+  updateOrderStatus = async ({
+    orderId,
+    status,
+    queryRunner
+  }: IUpdateOrderStatus): AsyncResponse<Order> => {
+    let code: ResponseCode = ResponseCode.OK
+
+    try {
+      const manager = queryRunner ? queryRunner.manager : AppDataSource.manager
+      const orderRepository = manager.getRepository(Order)
+
+      // Check if order exists
+      const existingOrder = await orderRepository.findOne({
+        where: { id: orderId }
+      })
+
+      if (!existingOrder) {
+        return { code: ResponseCode.NOT_FOUND }
+      }
+
+      // Update only the status
+      await orderRepository
+        .createQueryBuilder()
+        .update(Order)
+        .set({ status })
+        .where('id = :orderId', { orderId })
+        .execute()
+
+      // Reload order with relationships
+      const { order, code: getCode } = await this.getOrderById({
+        orderId,
+        queryRunner
+      })
+
+      if (!order) {
+        return { code: getCode }
+      }
+
+      return { order, code } as unknown as OrderResponse
+    } catch (err: any) {
+      code = ResponseCode.SERVER_ERROR
+      logger.error({
+        code,
+        message: getResponseMessage(code),
+        stack: err.stack
+      })
+    }
+
+    return { code } as unknown as OrderResponse
   }
 }

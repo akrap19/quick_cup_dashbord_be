@@ -99,6 +99,37 @@ const paths = {
         }
       }
     }
+  },
+  '/orders/{orderId}/status': {
+    patch: {
+      tags: ['Orders'],
+      description: 'Update order status',
+      parameters: [
+        {
+          in: 'path',
+          name: 'orderId',
+          type: 'string',
+          required: true
+        }
+      ],
+      requestBody: {
+        content: {
+          'application/json': {
+            schema: {
+              $ref: '#/definitions/update_order_status_body'
+            }
+          }
+        }
+      },
+      responses: {
+        '200': {
+          description: 'Successfully updated order status'
+        },
+        '404': {
+          description: 'Order not found'
+        }
+      }
+    }
   }
 }
 
@@ -128,6 +159,13 @@ const definitions = {
           quantity: 1,
           price: 15.0
         }
+      ],
+      additionalCosts: [
+        {
+          additionalCostId: 'uuid-here',
+          price: 10.5,
+          quantity: 2
+        }
       ]
     },
     description:
@@ -147,8 +185,22 @@ const definitions = {
           quantity: 3,
           price: 20.0
         }
+      ],
+      additionalCosts: [
+        {
+          additionalCostId: 'uuid-here',
+          price: 15.75,
+          quantity: 1
+        }
       ]
     }
+  },
+  update_order_status_body: {
+    example: {
+      status: 'ACCEPTED'
+    },
+    description:
+      'Valid status values: PENDING, ACCEPTED, DECLINED, PAYMENT_PENDING, PAYMENT_RECEIVED, IN_PRODUCTION, READY, IN_TRANSIT, COMPLETED. The response will include statusInfo with title, description, customerMessage, and adminMessage.'
   }
 }
 

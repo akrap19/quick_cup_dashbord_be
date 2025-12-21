@@ -3,6 +3,7 @@ import { autoInjectable } from 'tsyringe'
 
 import { ResponseCode } from '../../interface'
 import { OrdersService } from './ordersService'
+import { RoleType } from '../role/interface'
 
 @autoInjectable()
 export class OrdersController {
@@ -21,11 +22,18 @@ export class OrdersController {
     const searchTerm = typeof search === 'string' ? search : null
     const statusFilter = typeof status === 'string' ? status : null
 
+    // If user is a CLIENT, filter orders by their customerId
+    const isClient = req.user?.roles?.some(
+      (userRole) => userRole.role.name === RoleType.CLIENT
+    )
+    const customerId = isClient ? req.user?.id : null
+
     const { orders, pagination, code } = await this.ordersService.listOrders({
       page: pageNumber,
       limit: limitNumber,
       search: searchTerm,
-      status: statusFilter
+      status: statusFilter,
+      customerId
     })
 
     if (!orders || !pagination) {
@@ -45,8 +53,15 @@ export class OrdersController {
     const input = res.locals.input ?? {}
     const { orderId } = input
 
+    // If user is a CLIENT, filter orders by their customerId
+    const isClient = req.user?.roles?.some(
+      (userRole) => userRole.role.name === RoleType.CLIENT
+    )
+    const customerId = isClient ? req.user?.id : null
+
     const { order, code } = await this.ordersService.getOrderById({
-      orderId
+      orderId,
+      customerId
     })
 
     if (!order) {
@@ -70,7 +85,8 @@ export class OrdersController {
       contactPerson,
       contactPersonContact,
       products,
-      services
+      services,
+      additionalCosts
     } = input
 
     const numericAmount =
@@ -96,7 +112,8 @@ export class OrdersController {
       contactPerson,
       contactPersonContact,
       products,
-      services
+      services,
+      additionalCosts
     })
 
     if (!order) {
@@ -122,7 +139,8 @@ export class OrdersController {
       contactPerson,
       contactPersonContact,
       products,
-      services
+      services,
+      additionalCosts
     } = input
 
     const numericAmount =
@@ -146,7 +164,8 @@ export class OrdersController {
         typeof contactPerson === 'undefined' &&
         typeof contactPersonContact === 'undefined' &&
         typeof products === 'undefined' &&
-        typeof services === 'undefined')
+        typeof services === 'undefined' &&
+        typeof additionalCosts === 'undefined')
     ) {
       return next({ code: ResponseCode.INVALID_INPUT })
     }
@@ -165,7 +184,8 @@ export class OrdersController {
       contactPerson,
       contactPersonContact,
       products,
-      services
+      services,
+      additionalCosts
     })
 
     if (!order) {
@@ -184,5 +204,29 @@ export class OrdersController {
     })
 
     return next({ code })
+  }
+
+  updateOrderStatus = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const input = res.locals.input ?? {}
+    const { orderId, status } = input
+
+    if (typeof orderId !== 'string' || typeof status !== 'string') {
+      return next({ code: ResponseCode.INVALID_INPUT })
+    }
+
+    const { order, code } = await this.ordersService.updateOrderStatus({
+      orderId,
+      status
+    })
+
+    if (!order) {
+      return next({ code })
+    }
+
+    return next({ data: order, code })
   }
 }

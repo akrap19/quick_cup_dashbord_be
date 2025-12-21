@@ -30,12 +30,14 @@ export interface IDeleteEvent extends IServiceMethod {
 
 export interface IGetEventById extends IServiceMethod {
   eventId: string
+  userId?: string | null
 }
 
 export interface IListEvents extends IServiceMethod {
   search?: string | null
   page?: number
   limit?: number
+  userId?: string | null
 }
 
 export interface IEventsPagination {

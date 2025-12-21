@@ -1,11 +1,27 @@
 import { AsyncResponse, IServiceMethod } from '../../interface'
-import { PriceCalculationUnit } from './serviceModel'
+import {
+  PriceCalculationUnit,
+  AcquisitionType,
+  BillingInterval,
+  InputType
+} from './serviceModel'
 
 export interface ICreateService extends IServiceMethod {
   name: string
   description?: string | null
   priceCalculationUnit?: PriceCalculationUnit | null
-  prices?: Array<{
+  acquisitionType?: AcquisitionType | null
+  billingInterval?: BillingInterval | null
+  isDefaultServiceForBuy?: boolean | null
+  isDefaultServiceForRent?: boolean | null
+  inputTypeForBuy?: InputType | null
+  inputTypeForRent?: InputType | null
+  buyPrices?: Array<{
+    minQuantity: number
+    maxQuantity?: number | null
+    price: number
+  }>
+  rentPrices?: Array<{
     minQuantity: number
     maxQuantity?: number | null
     price: number
@@ -17,7 +33,18 @@ export interface IUpdateService extends IServiceMethod {
   name?: string
   description?: string | null
   priceCalculationUnit?: PriceCalculationUnit | null
-  prices?: Array<{
+  acquisitionType?: AcquisitionType | null
+  billingInterval?: BillingInterval | null
+  isDefaultServiceForBuy?: boolean | null
+  isDefaultServiceForRent?: boolean | null
+  inputTypeForBuy?: InputType | null
+  inputTypeForRent?: InputType | null
+  buyPrices?: Array<{
+    minQuantity: number
+    maxQuantity?: number | null
+    price: number
+  }>
+  rentPrices?: Array<{
     minQuantity: number
     maxQuantity?: number | null
     price: number
@@ -51,7 +78,15 @@ export interface IAllServicePrices {
   serviceId: string
   serviceName: string
   priceCalculationUnit: string | null
-  prices: Array<{
+  buyPrices: Array<{
+    id: string
+    minQuantity: number
+    maxQuantity: number | null
+    price: number
+    createdAt: Date
+    updatedAt: Date
+  }>
+  rentPrices: Array<{
     id: string
     minQuantity: number
     maxQuantity: number | null
@@ -61,7 +96,59 @@ export interface IAllServicePrices {
   }>
 }
 
-export interface IGetAllServicePrices extends IServiceMethod {}
+export interface IGetAllServicePrices extends IServiceMethod {
+  acquisitionType?: AcquisitionType.BUY | AcquisitionType.RENT
+}
+
+export interface ICalculateServicePrice extends IServiceMethod {
+  serviceId: string
+  productId: string
+  quantity: number
+  acquisitionType?: AcquisitionType.BUY | AcquisitionType.RENT
+}
+
+export interface ICalculateServicePriceResponse {
+  serviceId: string
+  productId: string
+  quantity: number
+  calculatedQuantity: number
+  priceCalculationUnit: PriceCalculationUnit | null
+  unitPrice: number
+  totalPrice: number
+  priceTier: {
+    minQuantity: number
+    maxQuantity: number | null
+    price: number
+  }
+}
+
+export interface ICalculateServicePriceForMultipleProducts
+  extends IServiceMethod {
+  serviceId: string
+  products: Array<{
+    productId: string
+    quantity: number
+  }>
+  acquisitionType?: AcquisitionType.BUY | AcquisitionType.RENT
+}
+
+export interface ICalculateServicePriceForMultipleProductsResponse {
+  serviceId: string
+  products: Array<{
+    productId: string
+    quantity: number
+    calculatedQuantity: number
+  }>
+  combinedCalculatedQuantity: number
+  priceCalculationUnit: PriceCalculationUnit | null
+  unitPrice: number
+  totalPrice: number
+  priceTier: {
+    minQuantity: number
+    maxQuantity: number | null
+    price: number
+  }
+}
 
 export interface IServiceService<T = unknown> {
   listServices(params: IListServices): AsyncResponse<IServicesPagination<T>>
@@ -69,5 +156,13 @@ export interface IServiceService<T = unknown> {
   createService(params: ICreateService): AsyncResponse<T>
   updateService(params: IUpdateService): AsyncResponse<T>
   deleteService(params: IDeleteService): AsyncResponse<null>
-  getAllServicePrices(): AsyncResponse<IAllServicePrices[]>
+  getAllServicePrices(
+    params?: IGetAllServicePrices
+  ): AsyncResponse<IAllServicePrices[]>
+  calculateServicePrice(
+    params: ICalculateServicePrice
+  ): AsyncResponse<ICalculateServicePriceResponse>
+  calculateServicePriceForMultipleProducts(
+    params: ICalculateServicePriceForMultipleProducts
+  ): AsyncResponse<ICalculateServicePriceForMultipleProductsResponse>
 }

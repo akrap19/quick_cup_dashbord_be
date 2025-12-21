@@ -56,13 +56,32 @@ export class ServicesController {
 
   createService = async (req: Request, res: Response, next: NextFunction) => {
     const input = res.locals.input ?? {}
-    const { name, description, priceCalculationUnit, prices } = input
+    const {
+      name,
+      description,
+      priceCalculationUnit,
+      acquisitionType,
+      billingInterval,
+      isDefaultServiceForBuy,
+      isDefaultServiceForRent,
+      inputTypeForBuy,
+      inputTypeForRent,
+      buyPrices,
+      rentPrices
+    } = input
 
     const { service, code } = await this.servicesService.createService({
       name,
       description,
       priceCalculationUnit,
-      prices
+      acquisitionType,
+      billingInterval,
+      isDefaultServiceForBuy,
+      isDefaultServiceForRent,
+      inputTypeForBuy,
+      inputTypeForRent,
+      buyPrices,
+      rentPrices
     })
 
     if (!service) {
@@ -74,14 +93,34 @@ export class ServicesController {
 
   updateService = async (req: Request, res: Response, next: NextFunction) => {
     const input = res.locals.input ?? {}
-    const { serviceId, name, description, priceCalculationUnit, prices } = input
+    const {
+      serviceId,
+      name,
+      description,
+      priceCalculationUnit,
+      acquisitionType,
+      billingInterval,
+      isDefaultServiceForBuy,
+      isDefaultServiceForRent,
+      inputTypeForBuy,
+      inputTypeForRent,
+      buyPrices,
+      rentPrices
+    } = input
 
     const { service, code } = await this.servicesService.updateService({
       serviceId,
       name,
       description,
       priceCalculationUnit,
-      prices
+      acquisitionType,
+      billingInterval,
+      isDefaultServiceForBuy,
+      isDefaultServiceForRent,
+      inputTypeForBuy,
+      inputTypeForRent,
+      buyPrices,
+      rentPrices
     })
 
     if (!service) {
@@ -107,7 +146,56 @@ export class ServicesController {
     res: Response,
     next: NextFunction
   ) => {
-    const { data, code } = await this.servicesService.getAllServicePrices()
+    const input = res.locals.input ?? {}
+    const { acquisitionType } = input
+
+    const { data, code } = await this.servicesService.getAllServicePrices({
+      acquisitionType
+    })
+
+    return next({ data, code })
+  }
+
+  calculateServicePrice = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const input = res.locals.input ?? {}
+    const { serviceId, productId, quantity, acquisitionType } = input
+
+    const { data, code } = await this.servicesService.calculateServicePrice({
+      serviceId,
+      productId,
+      quantity,
+      acquisitionType
+    })
+
+    if (!data) {
+      return next({ code })
+    }
+
+    return next({ data, code })
+  }
+
+  calculateServicePriceForMultipleProducts = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const input = res.locals.input ?? {}
+    const { serviceId, products, acquisitionType } = input
+
+    const { data, code } =
+      await this.servicesService.calculateServicePriceForMultipleProducts({
+        serviceId,
+        products,
+        acquisitionType
+      })
+
+    if (!data) {
+      return next({ code })
+    }
 
     return next({ data, code })
   }

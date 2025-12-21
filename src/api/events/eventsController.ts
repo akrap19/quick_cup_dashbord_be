@@ -3,6 +3,7 @@ import { autoInjectable } from 'tsyringe'
 
 import { ResponseCode } from '../../interface'
 import { EventsService } from './eventsService'
+import { RoleType } from '../role/interface'
 
 @autoInjectable()
 export class EventsController {
@@ -20,10 +21,17 @@ export class EventsController {
     const limitNumber = typeof limit === 'number' ? limit : undefined
     const searchTerm = typeof search === 'string' ? search : null
 
+    // If user is a CLIENT, filter events by their userId
+    const isClient = req.user?.roles?.some(
+      (userRole) => userRole.role.name === RoleType.CLIENT
+    )
+    const userId = isClient ? req.user?.id : null
+
     const { events, pagination, code } = await this.eventsService.listEvents({
       page: pageNumber,
       limit: limitNumber,
-      search: searchTerm
+      search: searchTerm,
+      userId
     })
 
     if (!events || !pagination) {
@@ -43,8 +51,15 @@ export class EventsController {
     const input = res.locals.input ?? {}
     const { eventId } = input
 
+    // If user is a CLIENT, filter events by their userId
+    const isClient = req.user?.roles?.some(
+      (userRole) => userRole.role.name === RoleType.CLIENT
+    )
+    const userId = isClient ? req.user?.id : null
+
     const { event, code } = await this.eventsService.getEventById({
-      eventId
+      eventId,
+      userId
     })
 
     if (!event) {

@@ -12,6 +12,7 @@ import { mediaRouter } from '../api/media/mediaRouter'
 import { productsRouter } from '../api/products/productsRouter'
 import { eventsRouter } from '../api/events/eventsRouter'
 import { ordersRouter } from '../api/orders/ordersRouter'
+import { additionalCostRouter } from '../api/additional_costs/additionalCostRouter'
 
 const router = express.Router()
 
@@ -27,5 +28,6 @@ router.use('/media', mediaRouter)
 router.use('/products', productsRouter)
 router.use('/events', eventsRouter)
 router.use('/orders', ordersRouter)
+router.use('/additional-costs', additionalCostRouter)
 
 export default router

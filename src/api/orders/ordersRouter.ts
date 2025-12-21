@@ -9,18 +9,24 @@ import {
   createOrderSchema,
   listOrdersSchema,
   orderIdParamSchema,
-  updateOrderSchema
+  updateOrderSchema,
+  updateOrderStatusSchema
 } from './ordersInput'
 
 const ordersController = container.resolve(OrdersController)
 export const ordersRouter = express.Router()
 
 const adminRoles = [RoleType.MASTER_ADMIN, RoleType.ADMIN]
+const allowedRolesForGet = [
+  RoleType.MASTER_ADMIN,
+  RoleType.ADMIN,
+  RoleType.CLIENT
+]
 
 ordersRouter.get(
   '/',
   requireToken,
-  requireRole(adminRoles),
+  requireRole(allowedRolesForGet),
   validate(listOrdersSchema),
   ordersController.listOrders
 )
@@ -28,7 +34,7 @@ ordersRouter.get(
 ordersRouter.get(
   '/:orderId',
   requireToken,
-  requireRole(adminRoles),
+  requireRole(allowedRolesForGet),
   validate(orderIdParamSchema),
   ordersController.getOrder
 )
@@ -55,4 +61,12 @@ ordersRouter.delete(
   requireRole(adminRoles),
   validate(orderIdParamSchema),
   ordersController.deleteOrder
+)
+
+ordersRouter.patch(
+  '/:orderId/status',
+  requireToken,
+  requireRole(adminRoles),
+  validate(updateOrderStatusSchema),
+  ordersController.updateOrderStatus
 )

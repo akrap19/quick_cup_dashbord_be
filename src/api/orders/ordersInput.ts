@@ -16,6 +16,12 @@ const orderServiceSchema = Joi.object({
   price: Joi.number().precision(4).positive().required()
 })
 
+const orderAdditionalCostSchema = Joi.object({
+  additionalCostId: uuidSchema.required(),
+  price: Joi.number().precision(4).positive().required(),
+  quantity: Joi.number().integer().min(1).allow(null).optional()
+})
+
 const baseOrderBody = {
   status: Joi.string().min(1).max(64),
   totalAmount: Joi.number().precision(2).positive(),
@@ -31,7 +37,8 @@ const baseOrderBody = {
   contactPerson: Joi.string().max(128).allow('', null).optional(),
   contactPersonContact: Joi.string().max(255).allow('', null).optional(),
   products: Joi.array().items(orderProductSchema).optional(),
-  services: Joi.array().items(orderServiceSchema).optional()
+  services: Joi.array().items(orderServiceSchema).optional(),
+  additionalCosts: Joi.array().items(orderAdditionalCostSchema).optional()
 }
 
 export const listOrdersSchema = (req: Request) => {
@@ -78,15 +85,22 @@ export const createOrderSchema = (req: Request) => {
       totalAmount: req.body.totalAmount,
       notes: req.body.notes ?? null,
       acquisitionType: req.body.acquisitionType,
-      customerId: req.body.customerId ?? null,
-      eventId: req.body.eventId ?? null,
+      customerId:
+        req.body.customerId === '' || req.body.customerId === undefined
+          ? null
+          : req.body.customerId,
+      eventId:
+        req.body.eventId === '' || req.body.eventId === undefined
+          ? null
+          : req.body.eventId,
       location: req.body.location ?? null,
       place: req.body.place ?? null,
       street: req.body.street ?? null,
       contactPerson: req.body.contactPerson ?? null,
       contactPersonContact: req.body.contactPersonContact ?? null,
       products: req.body.products ?? [],
-      services: req.body.services ?? []
+      services: req.body.services ?? [],
+      additionalCosts: req.body.additionalCosts ?? []
     }
   }
 }
@@ -106,15 +120,22 @@ export const updateOrderSchema = (req: Request) => {
       totalAmount: req.body.totalAmount,
       notes: req.body.notes ?? null,
       acquisitionType: req.body.acquisitionType,
-      customerId: req.body.customerId ?? null,
-      eventId: req.body.eventId ?? null,
+      customerId:
+        req.body.customerId === '' || req.body.customerId === undefined
+          ? null
+          : req.body.customerId,
+      eventId:
+        req.body.eventId === '' || req.body.eventId === undefined
+          ? null
+          : req.body.eventId,
       location: req.body.location ?? null,
       place: req.body.place ?? null,
       street: req.body.street ?? null,
       contactPerson: req.body.contactPerson ?? null,
       contactPersonContact: req.body.contactPersonContact ?? null,
       products: req.body.products,
-      services: req.body.services
+      services: req.body.services,
+      additionalCosts: req.body.additionalCosts
     }
   }
 }
@@ -128,6 +149,21 @@ export const orderIdParamSchema = (req: Request) => {
       .options({ abortEarly: false }),
     input: {
       orderId: req.params.orderId
+    }
+  }
+}
+
+export const updateOrderStatusSchema = (req: Request) => {
+  return {
+    schema: Joi.object()
+      .keys({
+        orderId: uuidSchema.required(),
+        status: Joi.string().min(1).max(64).required()
+      })
+      .options({ abortEarly: false }),
+    input: {
+      orderId: req.params.orderId,
+      status: req.body.status
     }
   }
 }

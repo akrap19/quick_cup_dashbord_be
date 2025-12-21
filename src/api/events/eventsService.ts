@@ -30,6 +30,7 @@ export class EventsService implements IEventService {
     search,
     page = 1,
     limit = 25,
+    userId,
     queryRunner
   }: IListEvents): AsyncResponse<IEventsPagination> => {
     let code: ResponseCode = ResponseCode.OK
@@ -43,6 +44,10 @@ export class EventsService implements IEventService {
         : this.eventRepository
 
       const query = repository.createQueryBuilder('event')
+
+      if (userId) {
+        query.andWhere('event.userId = :userId', { userId })
+      }
 
       if (search) {
         const searchLike = `%${search.toLowerCase()}%`
@@ -83,7 +88,7 @@ export class EventsService implements IEventService {
     return { code } as unknown as ListEventsResponse
   }
 
-  getEventById = async ({ eventId, queryRunner }: IGetEventById) => {
+  getEventById = async ({ eventId, userId, queryRunner }: IGetEventById) => {
     let code: ResponseCode = ResponseCode.OK
 
     try {
@@ -91,7 +96,13 @@ export class EventsService implements IEventService {
         ? queryRunner.manager.getRepository(EventModel)
         : this.eventRepository
 
-      const event = await repository.findOne({ where: { id: eventId } })
+      const query = repository.createQueryBuilder('event').where('event.id = :eventId', { eventId })
+
+      if (userId) {
+        query.andWhere('event.userId = :userId', { userId })
+      }
+
+      const event = await query.getOne()
 
       if (!event) {
         return { code: ResponseCode.NOT_FOUND }

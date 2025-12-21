@@ -16,11 +16,12 @@ const eventsController = container.resolve(EventsController)
 export const eventsRouter = express.Router()
 
 const adminRoles = [RoleType.MASTER_ADMIN, RoleType.ADMIN]
+const allowedRolesForGet = [RoleType.MASTER_ADMIN, RoleType.ADMIN, RoleType.CLIENT]
 
 eventsRouter.get(
   '/',
   requireToken,
-  requireRole(adminRoles),
+  requireRole(allowedRolesForGet),
   validate(listEventsSchema),
   eventsController.listEvents
 )
@@ -28,7 +29,7 @@ eventsRouter.get(
 eventsRouter.get(
   '/:eventId',
   requireToken,
-  requireRole(adminRoles),
+  requireRole(allowedRolesForGet),
   validate(eventIdParamSchema),
   eventsController.getEvent
 )

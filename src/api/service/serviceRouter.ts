@@ -1,6 +1,8 @@
 import express from 'express'
 import { ServicesController } from './serviceController'
 import {
+  calculateServicePriceForMultipleProductsSchema,
+  calculateServicePriceSchema,
   createServiceSchema,
   getAllServicePricesSchema,
   listServicesSchema,
@@ -63,4 +65,20 @@ serviceRouter.delete(
   requireRole(adminRoles),
   validate(serviceIdParamSchema),
   servicesController.deleteService
+)
+
+serviceRouter.post(
+  '/:serviceId/calculate-price',
+  requireToken,
+  requireRole(adminRoles),
+  validate(calculateServicePriceSchema),
+  servicesController.calculateServicePrice
+)
+
+serviceRouter.post(
+  '/:serviceId/calculate-price-multiple',
+  requireToken,
+  requireRole(adminRoles),
+  validate(calculateServicePriceForMultipleProductsSchema),
+  servicesController.calculateServicePriceForMultipleProducts
 )

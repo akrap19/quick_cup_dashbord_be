@@ -17,6 +17,8 @@ import { EventModel } from '../api/events/eventsModel'
 import { Order } from '../api/orders/ordersModel'
 import { OrderProduct } from '../api/orders/orderProductModel'
 import { OrderService } from '../api/orders/orderServiceModel'
+import { OrderAdditionalCost } from '../api/orders/orderAdditionalCostModel'
+import { AdditionalCost } from '../api/additional_costs/additionalCostModel'
 
 export const models = [
   Role,
@@ -34,6 +36,8 @@ export const models = [
   Order,
   OrderProduct,
   OrderService,
+  OrderAdditionalCost,
+  AdditionalCost,
   ServiceModel,
   ServicePrice,
   ServiceLocationModel,

@@ -23,7 +23,10 @@ import { ProductPrice } from './productPriceModel'
 import { ProductServicePrice } from './productServicePriceModel'
 import { Media } from '../media/mediaModel'
 import { ClientProductPrice } from '../client/clientProductPriceModel'
-import { ServiceModel } from '../service/serviceModel'
+import {
+  ServiceModel,
+  AcquisitionType as ServiceAcquisitionType
+} from '../service/serviceModel'
 import { ServicePrice } from '../service/servicePriceModel'
 import { getFileURL, deleteFile } from '../../services/cpanel'
 
@@ -142,7 +145,40 @@ export class ProductsService implements IProductService {
         .take(currentLimit)
         .getManyAndCount()
 
-      // Transform products to include image URLs and sorted prices
+      // Get all services with their default prices (fetch once for efficiency)
+      const allServices = await this.serviceRepository.find({
+        relations: ['prices'],
+        order: { id: 'ASC' }
+      })
+
+      // Get all product-specific service prices for products in this page
+      const productIds = products.map((p) => p.id)
+      const allProductServicePrices =
+        productIds.length > 0
+          ? await this.productServicePriceRepository.find({
+              where: { productId: In(productIds) },
+              relations: ['service'],
+              order: { productId: 'ASC', serviceId: 'ASC', minQuantity: 'ASC' }
+            })
+          : []
+
+      // Group product service prices by productId and serviceId
+      const productServicePricesMap = new Map<
+        string,
+        Map<string, ProductServicePrice[]>
+      >()
+      allProductServicePrices.forEach((price) => {
+        if (!productServicePricesMap.has(price.productId)) {
+          productServicePricesMap.set(price.productId, new Map())
+        }
+        const productMap = productServicePricesMap.get(price.productId)!
+        if (!productMap.has(price.serviceId)) {
+          productMap.set(price.serviceId, [])
+        }
+        productMap.get(price.serviceId)!.push(price)
+      })
+
+      // Transform products to include image URLs, sorted prices, and service prices
       const productsWithImages = await Promise.all(
         products.map(async (product) => {
           const images = product.images
@@ -165,10 +201,92 @@ export class ProductsService implements IProductService {
             ? [...product.prices].sort((a, b) => a.minQuantity - b.minQuantity)
             : []
 
+          // Filter services by product's acquisition type
+          const filteredServices = allServices.filter((service) => {
+            if (!service.acquisitionType) {
+              return false
+            }
+            // If service has 'both', include it for any product acquisition type
+            if (service.acquisitionType === ServiceAcquisitionType.BOTH) {
+              return true
+            }
+            // Otherwise, only include if service acquisition type matches product acquisition type
+            const productAcquisitionTypeAsService =
+              product.acquisitionType === AcquisitionType.BUY
+                ? ServiceAcquisitionType.BUY
+                : ServiceAcquisitionType.RENT
+            return service.acquisitionType === productAcquisitionTypeAsService
+          })
+
+          // Get product-specific service prices for this product
+          const productServicePricesForProduct =
+            productServicePricesMap.get(product.id) || new Map()
+
+          // Determine which acquisition type to use based on product
+          const relevantAcquisitionType =
+            product.acquisitionType === AcquisitionType.BUY
+              ? ServiceAcquisitionType.BUY
+              : ServiceAcquisitionType.RENT
+
+          // Build servicePrices: use product service prices if available, otherwise use default service prices
+          const servicePrices = filteredServices.map((service) => {
+            const productServicePricesForService =
+              productServicePricesForProduct.get(service.id)
+
+            // If product has custom prices for this service, use those
+            if (
+              productServicePricesForService &&
+              productServicePricesForService.length > 0
+            ) {
+              return {
+                serviceId: service.id,
+                serviceName: service.name || '',
+                billingInterval: service.billingInterval ?? null,
+                isDefaultServiceForBuy: service.isDefaultServiceForBuy ?? null,
+                isDefaultServiceForRent: service.isDefaultServiceForRent ?? null,
+                inputTypeForBuy: service.inputTypeForBuy ?? null,
+                inputTypeForRent: service.inputTypeForRent ?? null,
+                prices: productServicePricesForService.map((price: ProductServicePrice) => ({
+                  id: price.id,
+                  minQuantity: price.minQuantity,
+                  maxQuantity: price.maxQuantity ?? null,
+                  price: price.price,
+                  createdAt: price.createdAt,
+                  updatedAt: price.updatedAt
+                }))
+              }
+            }
+
+            // Otherwise, use default service prices filtered by product's acquisition type
+            const allDefaultPrices = service.prices || []
+            const defaultPrices = allDefaultPrices
+              .filter((p) => p.acquisitionType === relevantAcquisitionType)
+              .sort((a, b) => a.minQuantity - b.minQuantity)
+
+            return {
+              serviceId: service.id,
+              serviceName: service.name || '',
+              billingInterval: service.billingInterval ?? null,
+              isDefaultServiceForBuy: service.isDefaultServiceForBuy ?? null,
+              isDefaultServiceForRent: service.isDefaultServiceForRent ?? null,
+              inputTypeForBuy: service.inputTypeForBuy ?? null,
+              inputTypeForRent: service.inputTypeForRent ?? null,
+              prices: defaultPrices.map((price) => ({
+                id: price.id,
+                minQuantity: price.minQuantity,
+                maxQuantity: price.maxQuantity ?? null,
+                price: price.price,
+                createdAt: price.createdAt,
+                updatedAt: price.updatedAt
+              }))
+            }
+          })
+
           return {
             ...product,
             images,
-            prices
+            prices,
+            servicePrices
           }
         })
       )
@@ -243,6 +361,25 @@ export class ProductsService implements IProductService {
         order: { id: 'ASC' }
       })
 
+      // Filter services by product's acquisition type
+      // Only include services where service.acquisitionType matches product.acquisitionType or is 'both'
+      const filteredServices = allServices.filter((service) => {
+        if (!service.acquisitionType) {
+          return false
+        }
+        // If service has 'both', include it for any product acquisition type
+        if (service.acquisitionType === ServiceAcquisitionType.BOTH) {
+          return true
+        }
+        // Otherwise, only include if service acquisition type matches product acquisition type
+        // Convert product acquisition type to service acquisition type for comparison
+        const productAcquisitionTypeAsService =
+          product.acquisitionType === AcquisitionType.BUY
+            ? ServiceAcquisitionType.BUY
+            : ServiceAcquisitionType.RENT
+        return service.acquisitionType === productAcquisitionTypeAsService
+      })
+
       // Get product-specific service prices
       const productServicePrices =
         await this.productServicePriceRepository.find({
@@ -260,8 +397,14 @@ export class ProductsService implements IProductService {
         productServicePricesMap.get(price.serviceId)!.push(price)
       })
 
+      // Determine which acquisition type to use based on product
+      const relevantAcquisitionType =
+        product.acquisitionType === AcquisitionType.BUY
+          ? ServiceAcquisitionType.BUY
+          : ServiceAcquisitionType.RENT
+
       // Build servicePrices: use product service prices if available, otherwise use default service prices
-      const servicePrices = allServices.map((service) => {
+      const servicePrices = filteredServices.map((service) => {
         const productServicePricesForService = productServicePricesMap.get(
           service.id
         )
@@ -285,10 +428,11 @@ export class ProductsService implements IProductService {
           }
         }
 
-        // Otherwise, use default service prices
-        const defaultPrices = (service.prices || []).sort(
-          (a, b) => a.minQuantity - b.minQuantity
-        )
+        // Otherwise, use default service prices filtered by product's acquisition type
+        const allDefaultPrices = service.prices || []
+        const defaultPrices = allDefaultPrices
+          .filter((p) => p.acquisitionType === relevantAcquisitionType)
+          .sort((a, b) => a.minQuantity - b.minQuantity)
 
         return {
           serviceId: service.id,
@@ -1151,10 +1295,38 @@ export class ProductsService implements IProductService {
     let code: ResponseCode = ResponseCode.OK
 
     try {
+      // First, get the product to know its acquisition type
+      const product = await this.productRepository.findOne({
+        where: { id: productId }
+      })
+
+      if (!product) {
+        return { code: ResponseCode.NOT_FOUND }
+      }
+
       // Get all services with their default prices
       const allServices = await this.serviceRepository.find({
         relations: ['prices'],
         order: { id: 'ASC' }
+      })
+
+      // Filter services by product's acquisition type
+      // Only include services where service.acquisitionType matches product.acquisitionType or is 'both'
+      const filteredServices = allServices.filter((service) => {
+        if (!service.acquisitionType) {
+          return false
+        }
+        // If service has 'both', include it for any product acquisition type
+        if (service.acquisitionType === ServiceAcquisitionType.BOTH) {
+          return true
+        }
+        // Otherwise, only include if service acquisition type matches product acquisition type
+        // Convert product acquisition type to service acquisition type for comparison
+        const productAcquisitionTypeAsService =
+          product.acquisitionType === AcquisitionType.BUY
+            ? ServiceAcquisitionType.BUY
+            : ServiceAcquisitionType.RENT
+        return service.acquisitionType === productAcquisitionTypeAsService
       })
 
       // Get product-specific service prices
@@ -1174,8 +1346,14 @@ export class ProductsService implements IProductService {
         productServicePricesMap.get(price.serviceId)!.push(price)
       })
 
+      // Determine which acquisition type to use based on product
+      const relevantAcquisitionType =
+        product.acquisitionType === AcquisitionType.BUY
+          ? ServiceAcquisitionType.BUY
+          : ServiceAcquisitionType.RENT
+
       // Build result: use product service prices if available, otherwise use default service prices
-      const result = allServices.map((service) => {
+      const result = filteredServices.map((service) => {
         const productServicePricesForService = productServicePricesMap.get(
           service.id
         )
@@ -1199,10 +1377,11 @@ export class ProductsService implements IProductService {
           }
         }
 
-        // Otherwise, use default service prices
-        const defaultPrices = (service.prices || []).sort(
-          (a, b) => a.minQuantity - b.minQuantity
-        )
+        // Otherwise, use default service prices filtered by product's acquisition type
+        const allDefaultPrices = service.prices || []
+        const defaultPrices = allDefaultPrices
+          .filter((p) => p.acquisitionType === relevantAcquisitionType)
+          .sort((a, b) => a.minQuantity - b.minQuantity)
 
         return {
           serviceId: service.id,

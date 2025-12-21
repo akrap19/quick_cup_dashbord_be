@@ -14,6 +14,12 @@ export interface IOrderServiceInput {
   price: number
 }
 
+export interface IOrderAdditionalCostInput {
+  additionalCostId: string
+  price: number
+  quantity?: number | null
+}
+
 export interface ICreateOrder extends IServiceMethod {
   totalAmount: number
   notes?: string | null
@@ -27,6 +33,7 @@ export interface ICreateOrder extends IServiceMethod {
   contactPersonContact?: string | null
   products?: IOrderProductInput[]
   services?: IOrderServiceInput[]
+  additionalCosts?: IOrderAdditionalCostInput[]
 }
 
 export interface IUpdateOrder extends IServiceMethod {
@@ -44,6 +51,7 @@ export interface IUpdateOrder extends IServiceMethod {
   contactPersonContact?: string | null
   products?: IOrderProductInput[]
   services?: IOrderServiceInput[]
+  additionalCosts?: IOrderAdditionalCostInput[]
 }
 
 export interface IDeleteOrder extends IServiceMethod {
@@ -52,6 +60,7 @@ export interface IDeleteOrder extends IServiceMethod {
 
 export interface IGetOrderById extends IServiceMethod {
   orderId: string
+  customerId?: string | null
 }
 
 export interface IListOrders extends IServiceMethod {
@@ -59,6 +68,12 @@ export interface IListOrders extends IServiceMethod {
   page?: number
   limit?: number
   status?: string | null
+  customerId?: string | null
+}
+
+export interface IUpdateOrderStatus extends IServiceMethod {
+  orderId: string
+  status: string
 }
 
 export interface IOrdersPagination {
@@ -75,5 +90,6 @@ export interface IOrderService {
   getOrderById(params: IGetOrderById): AsyncResponse<Order>
   createOrder(params: ICreateOrder): AsyncResponse<Order>
   updateOrder(params: IUpdateOrder): AsyncResponse<Order>
+  updateOrderStatus(params: IUpdateOrderStatus): AsyncResponse<Order>
   deleteOrder(params: IDeleteOrder): AsyncResponse<null>
 }

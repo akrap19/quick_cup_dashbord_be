@@ -13,6 +13,7 @@ import { User } from '../user/userModel'
 import { EventModel } from '../events/eventsModel'
 import { OrderProduct } from './orderProductModel'
 import { OrderService } from './orderServiceModel'
+import { OrderAdditionalCost } from './orderAdditionalCostModel'
 
 @Entity()
 export class Order {
@@ -75,6 +76,12 @@ export class Order {
 
   @OneToMany(() => OrderService, (orderService) => orderService.order)
   services?: OrderService[]
+
+  @OneToMany(
+    () => OrderAdditionalCost,
+    (orderAdditionalCost) => orderAdditionalCost.order
+  )
+  additionalCosts?: OrderAdditionalCost[]
 
   @Column({
     type: 'timestamp',
