@@ -13,7 +13,8 @@ const orderProductSchema = Joi.object({
 const orderServiceSchema = Joi.object({
   serviceId: uuidSchema.required(),
   quantity: Joi.number().integer().min(1).required(),
-  price: Joi.number().precision(4).positive().required()
+  price: Joi.number().precision(4).positive().required(),
+  serviceLocationId: uuidSchema.allow(null).optional()
 })
 
 const orderAdditionalCostSchema = Joi.object({

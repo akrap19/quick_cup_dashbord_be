@@ -15,15 +15,18 @@ import {
   IUpdateEvent
 } from './interface'
 import { EventModel } from './eventsModel'
+import { User } from '../user/userModel'
 
 type ListEventsResponse = Awaited<AsyncResponse<IEventsPagination>>
 
 @autoInjectable()
 export class EventsService implements IEventService {
   private readonly eventRepository: Repository<EventModel>
+  private readonly userRepository: Repository<User>
 
   constructor() {
     this.eventRepository = AppDataSource.manager.getRepository(EventModel)
+    this.userRepository = AppDataSource.manager.getRepository(User)
   }
 
   listEvents = async ({
@@ -96,7 +99,13 @@ export class EventsService implements IEventService {
         ? queryRunner.manager.getRepository(EventModel)
         : this.eventRepository
 
-      const query = repository.createQueryBuilder('event').where('event.id = :eventId', { eventId })
+      const userRepo = queryRunner
+        ? queryRunner.manager.getRepository(User)
+        : this.userRepository
+
+      const query = repository
+        .createQueryBuilder('event')
+        .where('event.id = :eventId', { eventId })
 
       if (userId) {
         query.andWhere('event.userId = :userId', { userId })
@@ -108,7 +117,16 @@ export class EventsService implements IEventService {
         return { code: ResponseCode.NOT_FOUND }
       }
 
-      return { event, code }
+      // Fetch user to get firstName and lastName
+      const user = await userRepo.findOne({ where: { id: event.userId } })
+
+      // Add userName field
+      const eventWithUserName = {
+        ...event,
+        userName: user ? `${user.firstName} ${user.lastName}`.trim() : null
+      }
+
+      return { event: eventWithUserName, code }
     } catch (err: any) {
       code = ResponseCode.SERVER_ERROR
       logger.error({

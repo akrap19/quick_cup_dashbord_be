@@ -10,6 +10,7 @@ import {
 } from 'typeorm'
 import { Order } from './ordersModel'
 import { ServiceModel } from '../service/serviceModel'
+import { ServiceLocationModel } from '../service_location/serviceLocationModel'
 import { decimalTransformer } from '../../services/utils'
 
 @Entity('order_service')
@@ -43,6 +44,16 @@ export class OrderService {
   })
   price!: number
 
+  @Column({ type: 'uuid', nullable: true })
+  serviceLocationId?: string | null
+
+  @ManyToOne(() => ServiceLocationModel, {
+    onDelete: 'SET NULL',
+    nullable: true
+  })
+  @JoinColumn({ name: 'service_location_id' })
+  serviceLocation?: ServiceLocationModel | null
+
   @CreateDateColumn({
     type: 'timestamp',
     default: () => 'CURRENT_TIMESTAMP(6)'
@@ -60,12 +71,13 @@ export class OrderService {
     orderId: string,
     serviceId: string,
     quantity: number,
-    price: number
+    price: number,
+    serviceLocationId?: string | null
   ) {
     this.orderId = orderId
     this.serviceId = serviceId
     this.quantity = quantity
     this.price = price
+    this.serviceLocationId = serviceLocationId ?? null
   }
 }
-

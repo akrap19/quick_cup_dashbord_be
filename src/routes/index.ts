@@ -13,6 +13,7 @@ import { productsRouter } from '../api/products/productsRouter'
 import { eventsRouter } from '../api/events/eventsRouter'
 import { ordersRouter } from '../api/orders/ordersRouter'
 import { additionalCostRouter } from '../api/additional_costs/additionalCostRouter'
+import { productStateRouter } from '../api/product_state/productStateRouter'
 
 const router = express.Router()
 
@@ -29,5 +30,6 @@ router.use('/products', productsRouter)
 router.use('/events', eventsRouter)
 router.use('/orders', ordersRouter)
 router.use('/additional-costs', additionalCostRouter)
+router.use('/product-states', productStateRouter)
 
 export default router

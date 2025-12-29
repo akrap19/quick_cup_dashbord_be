@@ -294,6 +294,52 @@ const definitions = {
         },
         description:
           'Array of service prices for the product. Can optionally include service prices when creating a product.'
+      },
+      productStates: {
+        type: 'array',
+        items: {
+          type: 'object',
+          required: ['status', 'location', 'quantity'],
+          properties: {
+            status: {
+              type: 'string',
+              enum: [
+                'available',
+                'in_use',
+                'maintenance',
+                'reserved',
+                'damaged'
+              ],
+              description: 'Status of the product state'
+            },
+            location: {
+              type: 'string',
+              enum: ['service', 'user'],
+              description: 'Location type of the product state'
+            },
+            quantity: {
+              type: 'integer',
+              minimum: 0,
+              description: 'Quantity of products in this state'
+            },
+            serviceId: {
+              type: 'string',
+              format: 'uuid',
+              nullable: true,
+              description:
+                'Service ID (required when location is "service", must be null when location is "user")'
+            },
+            userId: {
+              type: 'string',
+              format: 'uuid',
+              nullable: true,
+              description:
+                'User ID (required when location is "user", must be null when location is "service")'
+            }
+          }
+        },
+        description:
+          'Array of product states. Each state represents where products are located (service or user) and their status.'
       }
     },
     example: {
@@ -340,6 +386,22 @@ const definitions = {
               price: 22.0
             }
           ]
+        }
+      ],
+      productStates: [
+        {
+          status: 'available',
+          location: 'service',
+          quantity: 10,
+          serviceId: '83d0de32-41a0-4474-b93b-78c8e96e31a6',
+          userId: null
+        },
+        {
+          status: 'in_use',
+          location: 'user',
+          quantity: 5,
+          serviceId: null,
+          userId: '123e4567-e89b-12d3-a456-426614174000'
         }
       ]
     }
@@ -473,6 +535,52 @@ const definitions = {
         },
         description:
           'Array of service prices for the product. Can optionally update service prices for the product (replaces all existing service prices).'
+      },
+      productStates: {
+        type: 'array',
+        items: {
+          type: 'object',
+          required: ['status', 'location', 'quantity'],
+          properties: {
+            status: {
+              type: 'string',
+              enum: [
+                'available',
+                'in_use',
+                'maintenance',
+                'reserved',
+                'damaged'
+              ],
+              description: 'Status of the product state'
+            },
+            location: {
+              type: 'string',
+              enum: ['service', 'user'],
+              description: 'Location type of the product state'
+            },
+            quantity: {
+              type: 'integer',
+              minimum: 0,
+              description: 'Quantity of products in this state'
+            },
+            serviceId: {
+              type: 'string',
+              format: 'uuid',
+              nullable: true,
+              description:
+                'Service ID (required when location is "service", must be null when location is "user")'
+            },
+            userId: {
+              type: 'string',
+              format: 'uuid',
+              nullable: true,
+              description:
+                'User ID (required when location is "user", must be null when location is "service")'
+            }
+          }
+        },
+        description:
+          'Array of product states. Can optionally update product states (replaces all existing product states).'
       }
     },
     example: {
@@ -520,6 +628,22 @@ const definitions = {
               price: 22.0
             }
           ]
+        }
+      ],
+      productStates: [
+        {
+          status: 'available',
+          location: 'service',
+          quantity: 15,
+          serviceId: '83d0de32-41a0-4474-b93b-78c8e96e31a6',
+          userId: null
+        },
+        {
+          status: 'reserved',
+          location: 'user',
+          quantity: 3,
+          serviceId: null,
+          userId: '123e4567-e89b-12d3-a456-426614174000'
         }
       ]
     }

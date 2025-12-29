@@ -12,6 +12,7 @@ import { productsDocs } from '../api/products/productsDocs'
 import { eventsDocs } from '../api/events/eventsDocs'
 import { ordersDocs } from '../api/orders/ordersDocs'
 import { additionalCostDocs } from '../api/additional_costs/additionalCostDocs'
+import { productStateDocs } from '../api/product_state/productStateDocs'
 
 export const APIDocumentation = {
   openapi: '3.0.1',
@@ -53,6 +54,7 @@ export const APIDocumentation = {
     eventsDocs,
     ordersDocs,
     additionalCostDocs,
+    productStateDocs,
     (a: object, b: object) => {
       if (_.isArray(a)) {
         return a.concat(b)

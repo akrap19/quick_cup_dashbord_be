@@ -12,6 +12,7 @@ export interface IOrderServiceInput {
   serviceId: string
   quantity: number
   price: number
+  serviceLocationId?: string | null
 }
 
 export interface IOrderAdditionalCostInput {

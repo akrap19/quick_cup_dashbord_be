@@ -29,6 +29,13 @@ export interface ICreateProduct extends IServiceMethod {
       price: number
     }>
   }>
+  productStates?: Array<{
+    status: string
+    location: string
+    quantity: number
+    serviceId?: string | null
+    userId?: string | null
+  }>
 }
 
 export interface IUpdateProduct extends IServiceMethod {
@@ -55,6 +62,13 @@ export interface IUpdateProduct extends IServiceMethod {
       maxQuantity?: number | null
       price: number
     }>
+  }>
+  productStates?: Array<{
+    status: string
+    location: string
+    quantity: number
+    serviceId?: string | null
+    userId?: string | null
   }>
 }
 

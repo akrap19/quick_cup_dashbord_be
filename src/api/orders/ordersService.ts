@@ -105,6 +105,7 @@ export class OrdersService implements IOrderService {
         .leftJoinAndSelect('order.event', 'event')
         .leftJoinAndSelect('order.products', 'products')
         .leftJoinAndSelect('order.services', 'services')
+        .leftJoinAndSelect('services.serviceLocation', 'serviceLocation')
         .leftJoinAndSelect('order.additionalCosts', 'additionalCosts')
         .leftJoinAndSelect('additionalCosts.additionalCost', 'additionalCost')
         .orderBy('order.placedAt', 'DESC')
@@ -173,6 +174,7 @@ export class OrdersService implements IOrderService {
         .leftJoinAndSelect('productImages.media', 'productMedia')
         .leftJoinAndSelect('order.services', 'services')
         .leftJoinAndSelect('services.service', 'service')
+        .leftJoinAndSelect('services.serviceLocation', 'serviceLocation')
         .leftJoinAndSelect('order.additionalCosts', 'additionalCosts')
         .leftJoinAndSelect('additionalCosts.additionalCost', 'additionalCost')
         .where('order.id = :orderId', { orderId })
@@ -306,7 +308,8 @@ export class OrdersService implements IOrderService {
             orderId: savedOrder.id,
             serviceId: service.serviceId,
             quantity: service.quantity,
-            price: service.price
+            price: service.price,
+            serviceLocationId: service.serviceLocationId ?? null
           })
         )
         await orderServiceRepository.save(orderServices)
@@ -365,6 +368,7 @@ export class OrdersService implements IOrderService {
         .leftJoinAndSelect('productImages.media', 'productMedia')
         .leftJoinAndSelect('order.services', 'services')
         .leftJoinAndSelect('services.service', 'service')
+        .leftJoinAndSelect('services.serviceLocation', 'serviceLocation')
         .where('order.id = :orderId', { orderId: savedOrder.id })
         .getOne()
 
@@ -548,7 +552,8 @@ export class OrdersService implements IOrderService {
               orderId,
               serviceId: service.serviceId,
               quantity: service.quantity,
-              price: service.price
+              price: service.price,
+              serviceLocationId: service.serviceLocationId ?? null
             })
           )
           await orderServiceRepository.save(orderServices)

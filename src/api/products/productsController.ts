@@ -69,7 +69,8 @@ export class ProductsController {
       acquisitionType,
       imageIds,
       prices,
-      servicePrices
+      servicePrices,
+      productStates
     } = input
 
     const { product, code } = await this.productsService.createProduct({
@@ -83,7 +84,8 @@ export class ProductsController {
       acquisitionType,
       imageIds,
       prices,
-      servicePrices
+      servicePrices,
+      productStates
     })
 
     if (!product) {
@@ -108,7 +110,8 @@ export class ProductsController {
       imageIdsToAdd,
       imageIdsToRemove,
       prices,
-      servicePrices
+      servicePrices,
+      productStates
     } = input
 
     const { product, code } = await this.productsService.updateProduct({
@@ -124,7 +127,8 @@ export class ProductsController {
       imageIdsToAdd,
       imageIdsToRemove,
       prices,
-      servicePrices
+      servicePrices,
+      productStates
     })
 
     if (!product) {

@@ -23,6 +23,11 @@ import { ProductPrice } from './productPriceModel'
 import { ProductServicePrice } from './productServicePriceModel'
 import { Media } from '../media/mediaModel'
 import { ClientProductPrice } from '../client/clientProductPriceModel'
+import { ProductState } from '../product_state/productStateModel'
+import {
+  ProductStateStatus,
+  ProductStateLocation
+} from '../product_state/interface'
 import {
   ServiceModel,
   AcquisitionType as ServiceAcquisitionType
@@ -44,6 +49,7 @@ export class ProductsService implements IProductService {
   private readonly clientProductPriceRepository: Repository<ClientProductPrice>
   private readonly serviceRepository: Repository<ServiceModel>
   private readonly servicePriceRepository: Repository<ServicePrice>
+  private readonly productStateRepository: Repository<ProductState>
 
   constructor() {
     this.productRepository = AppDataSource.manager.getRepository(Product)
@@ -59,6 +65,8 @@ export class ProductsService implements IProductService {
     this.serviceRepository = AppDataSource.manager.getRepository(ServiceModel)
     this.servicePriceRepository =
       AppDataSource.manager.getRepository(ServicePrice)
+    this.productStateRepository =
+      AppDataSource.manager.getRepository(ProductState)
   }
 
   private validatePriceTiers(
@@ -139,6 +147,9 @@ export class ProductsService implements IProductService {
         .leftJoinAndSelect('product.images', 'images')
         .leftJoinAndSelect('images.media', 'media')
         .leftJoinAndSelect('product.prices', 'prices')
+        .leftJoinAndSelect('product.productStates', 'productStates')
+        .leftJoinAndSelect('productStates.service', 'stateService')
+        .leftJoinAndSelect('productStates.user', 'stateUser')
         .orderBy('product.createdAt', 'DESC')
         .addOrderBy('prices.minQuantity', 'ASC')
         .skip(offset)
@@ -243,17 +254,20 @@ export class ProductsService implements IProductService {
                 serviceName: service.name || '',
                 billingInterval: service.billingInterval ?? null,
                 isDefaultServiceForBuy: service.isDefaultServiceForBuy ?? null,
-                isDefaultServiceForRent: service.isDefaultServiceForRent ?? null,
+                isDefaultServiceForRent:
+                  service.isDefaultServiceForRent ?? null,
                 inputTypeForBuy: service.inputTypeForBuy ?? null,
                 inputTypeForRent: service.inputTypeForRent ?? null,
-                prices: productServicePricesForService.map((price: ProductServicePrice) => ({
-                  id: price.id,
-                  minQuantity: price.minQuantity,
-                  maxQuantity: price.maxQuantity ?? null,
-                  price: price.price,
-                  createdAt: price.createdAt,
-                  updatedAt: price.updatedAt
-                }))
+                prices: productServicePricesForService.map(
+                  (price: ProductServicePrice) => ({
+                    id: price.id,
+                    minQuantity: price.minQuantity,
+                    maxQuantity: price.maxQuantity ?? null,
+                    price: price.price,
+                    createdAt: price.createdAt,
+                    updatedAt: price.updatedAt
+                  })
+                )
               }
             }
 
@@ -282,11 +296,40 @@ export class ProductsService implements IProductService {
             }
           })
 
+          // Get product states
+          const productStates = product.productStates
+            ? product.productStates.map((state) => ({
+                id: state.id,
+                status: state.status,
+                location: state.location,
+                quantity: state.quantity,
+                serviceId: state.serviceId ?? null,
+                service: state.service
+                  ? {
+                      id: state.service.id,
+                      name: state.service.name
+                    }
+                  : null,
+                userId: state.userId ?? null,
+                user: state.user
+                  ? {
+                      id: state.user.id,
+                      firstName: state.user.firstName,
+                      lastName: state.user.lastName,
+                      email: state.user.email
+                    }
+                  : null,
+                createdAt: state.createdAt,
+                updatedAt: state.updatedAt
+              }))
+            : []
+
           return {
             ...product,
             images,
             prices,
-            servicePrices
+            servicePrices,
+            productStates
           }
         })
       )
@@ -327,7 +370,14 @@ export class ProductsService implements IProductService {
 
       const product = await repository.findOne({
         where: { id: productId },
-        relations: ['images', 'images.media', 'prices']
+        relations: [
+          'images',
+          'images.media',
+          'prices',
+          'productStates',
+          'productStates.service',
+          'productStates.user'
+        ]
       })
 
       if (!product) {
@@ -448,11 +498,40 @@ export class ProductsService implements IProductService {
         }
       })
 
+      // Get product states
+      const productStates = product.productStates
+        ? product.productStates.map((state) => ({
+            id: state.id,
+            status: state.status,
+            location: state.location,
+            quantity: state.quantity,
+            serviceId: state.serviceId ?? null,
+            service: state.service
+              ? {
+                  id: state.service.id,
+                  name: state.service.name
+                }
+              : null,
+            userId: state.userId ?? null,
+            user: state.user
+              ? {
+                  id: state.user.id,
+                  firstName: state.user.firstName,
+                  lastName: state.user.lastName,
+                  email: state.user.email
+                }
+              : null,
+            createdAt: state.createdAt,
+            updatedAt: state.updatedAt
+          }))
+        : []
+
       const productWithImages = {
         ...product,
         images,
         prices,
-        servicePrices
+        servicePrices,
+        productStates
       }
 
       return { product: productWithImages, code } as unknown as ProductResponse
@@ -480,6 +559,7 @@ export class ProductsService implements IProductService {
     imageIds,
     prices,
     servicePrices,
+    productStates,
     queryRunner
   }: ICreateProduct): AsyncResponse<Product> => {
     let code: ResponseCode = ResponseCode.OK
@@ -571,6 +651,56 @@ export class ProductsService implements IProductService {
         }
       }
 
+      // Create product states if provided
+      if (productStates && productStates.length > 0) {
+        const productStateRepository = queryRunner
+          ? queryRunner.manager.getRepository(ProductState)
+          : this.productStateRepository
+
+        for (const state of productStates) {
+          // Validate location-specific fields
+          if (
+            state.location === ProductStateLocation.SERVICE &&
+            !state.serviceId
+          ) {
+            return { code: ResponseCode.INVALID_INPUT }
+          }
+          if (state.location === ProductStateLocation.USER && !state.userId) {
+            return { code: ResponseCode.INVALID_INPUT }
+          }
+          if (state.location === ProductStateLocation.SERVICE && state.userId) {
+            return { code: ResponseCode.INVALID_INPUT }
+          }
+          if (state.location === ProductStateLocation.USER && state.serviceId) {
+            return { code: ResponseCode.INVALID_INPUT }
+          }
+
+          const productState = productStateRepository.create({
+            status: state.status as ProductStateStatus,
+            location: state.location as ProductStateLocation,
+            quantity: state.quantity,
+            productId: savedProduct.id,
+            serviceId:
+              state.location === ProductStateLocation.SERVICE
+                ? state.serviceId
+                : null,
+            userId:
+              state.location === ProductStateLocation.USER ? state.userId : null
+          })
+
+          try {
+            await productStateRepository.save(productState)
+          } catch (saveErr: any) {
+            logger.error({
+              code: ResponseCode.SERVER_ERROR,
+              message: 'Failed to save product state',
+              stack: saveErr.stack
+            })
+            throw saveErr
+          }
+        }
+      }
+
       // Associate images if provided
       if (imageIds && imageIds.length > 0) {
         const productMediaRepository = queryRunner
@@ -618,10 +748,17 @@ export class ProductsService implements IProductService {
         }
       }
 
-      // Reload product with images and prices
+      // Reload product with images, prices, and product states
       const productWithImages = await repository.findOne({
         where: { id: savedProduct.id },
-        relations: ['images', 'images.media', 'prices']
+        relations: [
+          'images',
+          'images.media',
+          'prices',
+          'productStates',
+          'productStates.service',
+          'productStates.user'
+        ]
       })
 
       if (!productWithImages) {
@@ -651,10 +788,39 @@ export class ProductsService implements IProductService {
           )
         : []
 
+      // Get product states
+      const transformedProductStates = productWithImages.productStates
+        ? productWithImages.productStates.map((state) => ({
+            id: state.id,
+            status: state.status,
+            location: state.location,
+            quantity: state.quantity,
+            serviceId: state.serviceId ?? null,
+            service: state.service
+              ? {
+                  id: state.service.id,
+                  name: state.service.name
+                }
+              : null,
+            userId: state.userId ?? null,
+            user: state.user
+              ? {
+                  id: state.user.id,
+                  firstName: state.user.firstName,
+                  lastName: state.user.lastName,
+                  email: state.user.email
+                }
+              : null,
+            createdAt: state.createdAt,
+            updatedAt: state.updatedAt
+          }))
+        : []
+
       const productResponse = {
         ...productWithImages,
         images,
-        prices: sortedPrices
+        prices: sortedPrices,
+        productStates: transformedProductStates
       }
 
       return { product: productResponse, code } as unknown as ProductResponse
@@ -684,6 +850,7 @@ export class ProductsService implements IProductService {
     imageIdsToRemove,
     prices,
     servicePrices,
+    productStates,
     queryRunner
   }: IUpdateProduct): AsyncResponse<Product> => {
     let code: ResponseCode = ResponseCode.OK
@@ -1041,6 +1208,70 @@ export class ProductsService implements IProductService {
             productId,
             deletedCount: deleteResult.affected || 0
           })
+        }
+      }
+
+      // Handle product states if provided
+      if (productStates !== undefined) {
+        const productStateRepository = queryRunner
+          ? queryRunner.manager.getRepository(ProductState)
+          : this.productStateRepository
+
+        // Delete all existing product states for this product
+        await productStateRepository.delete({ productId })
+
+        // Create new product states if provided
+        if (productStates && productStates.length > 0) {
+          for (const state of productStates) {
+            // Validate location-specific fields
+            if (
+              state.location === ProductStateLocation.SERVICE &&
+              !state.serviceId
+            ) {
+              return { code: ResponseCode.INVALID_INPUT }
+            }
+            if (state.location === ProductStateLocation.USER && !state.userId) {
+              return { code: ResponseCode.INVALID_INPUT }
+            }
+            if (
+              state.location === ProductStateLocation.SERVICE &&
+              state.userId
+            ) {
+              return { code: ResponseCode.INVALID_INPUT }
+            }
+            if (
+              state.location === ProductStateLocation.USER &&
+              state.serviceId
+            ) {
+              return { code: ResponseCode.INVALID_INPUT }
+            }
+
+            const productState = productStateRepository.create({
+              status: state.status as ProductStateStatus,
+              location: state.location as ProductStateLocation,
+              quantity: state.quantity,
+              productId,
+              serviceId:
+                state.location === ProductStateLocation.SERVICE
+                  ? state.serviceId
+                  : null,
+              userId:
+                state.location === ProductStateLocation.USER
+                  ? state.userId
+                  : null
+            })
+
+            try {
+              await productStateRepository.save(productState)
+            } catch (saveErr: any) {
+              logger.error({
+                code: ResponseCode.SERVER_ERROR,
+                message: 'Failed to save product state',
+                stack: saveErr.stack
+              })
+              throw saveErr
+            }
+          }
         }
       }
 

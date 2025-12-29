@@ -9,6 +9,7 @@ import {
 import { AcquisitionType } from './interface'
 import { ProductMedia } from './productsMediaModel'
 import { ProductPrice } from './productPriceModel'
+import { ProductState } from '../product_state/productStateModel'
 
 @Entity()
 export class Product {
@@ -48,6 +49,9 @@ export class Product {
 
   @OneToMany(() => ProductPrice, (price) => price.product)
   prices?: ProductPrice[]
+
+  @OneToMany(() => ProductState, (productState) => productState.product)
+  productStates?: ProductState[]
 
   @CreateDateColumn({
     type: 'timestamp',

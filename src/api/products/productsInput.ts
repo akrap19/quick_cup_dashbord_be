@@ -1,6 +1,10 @@
 import { Request } from 'express'
 import Joi from 'joi'
 import { AcquisitionType } from './interface'
+import {
+  ProductStateStatus,
+  ProductStateLocation
+} from '../product_state/interface'
 
 const uuidSchema = Joi.string().guid({ version: 'uuidv4' })
 
@@ -15,6 +19,56 @@ const priceTierSchema = Joi.object({
       'number.min': 'maxQuantity must be greater than or equal to minQuantity'
     }),
   price: Joi.number().positive().required()
+})
+
+const productStateSchema = Joi.object({
+  status: Joi.string()
+    .valid(
+      ProductStateStatus.AVAILABLE,
+      ProductStateStatus.IN_USE,
+      ProductStateStatus.MAINTENANCE,
+      ProductStateStatus.RESERVED,
+      ProductStateStatus.DAMAGED
+    )
+    .required(),
+  location: Joi.string()
+    .valid(ProductStateLocation.SERVICE, ProductStateLocation.USER)
+    .required(),
+  quantity: Joi.number().integer().min(0).required(),
+  serviceId: uuidSchema
+    .when('location', {
+      is: ProductStateLocation.SERVICE,
+      then: Joi.required(),
+      otherwise: Joi.allow(null).optional()
+    }),
+  userId: uuidSchema
+    .when('location', {
+      is: ProductStateLocation.USER,
+      then: Joi.required(),
+      otherwise: Joi.allow(null).optional()
+    })
+}).custom((value, helpers) => {
+  if (value.location === ProductStateLocation.SERVICE && !value.serviceId) {
+    return helpers.error('any.custom', {
+      message: 'serviceId is required when location is service'
+    })
+  }
+  if (value.location === ProductStateLocation.USER && !value.userId) {
+    return helpers.error('any.custom', {
+      message: 'userId is required when location is user'
+    })
+  }
+  if (value.location === ProductStateLocation.SERVICE && value.userId) {
+    return helpers.error('any.custom', {
+      message: 'userId must not be provided when location is service'
+    })
+  }
+  if (value.location === ProductStateLocation.USER && value.serviceId) {
+    return helpers.error('any.custom', {
+      message: 'serviceId must not be provided when location is user'
+    })
+  }
+  return value
 })
 
 const baseProductBody = {
@@ -78,7 +132,8 @@ export const createProductSchema = (req: Request) => {
               prices: Joi.array().items(priceTierSchema).required()
             })
           )
-          .optional()
+          .optional(),
+        productStates: Joi.array().items(productStateSchema).optional()
       })
       .options({ abortEarly: false }),
     input: {
@@ -96,6 +151,9 @@ export const createProductSchema = (req: Request) => {
       prices: Array.isArray(req.body.prices) ? req.body.prices : undefined,
       servicePrices: Array.isArray(req.body.servicePrices)
         ? req.body.servicePrices
+        : undefined,
+      productStates: Array.isArray(req.body.productStates)
+        ? req.body.productStates
         : undefined
     }
   }
@@ -117,7 +175,8 @@ export const updateProductSchema = (req: Request) => {
               prices: Joi.array().items(priceTierSchema).required()
             })
           )
-          .optional()
+          .optional(),
+        productStates: Joi.array().items(productStateSchema).optional()
       })
       .min(2)
       .options({ abortEarly: false }),
@@ -140,6 +199,9 @@ export const updateProductSchema = (req: Request) => {
       prices: Array.isArray(req.body.prices) ? req.body.prices : undefined,
       servicePrices: Array.isArray(req.body.servicePrices)
         ? req.body.servicePrices
+        : undefined,
+      productStates: Array.isArray(req.body.productStates)
+        ? req.body.productStates
         : undefined
     }
   }
