@@ -15,6 +15,9 @@ export interface IEditUser {
       price: number
     }>
   }>
+  companyName?: string | null
+  pin?: string | null
+  street?: string | null
 }
 
 interface IUsersPagination {
@@ -29,6 +32,10 @@ interface IUsersPagination {
 export interface IClientsLimited {
   userId: string
   name: string
+  email: string
+  phoneNumber: string | null
+  status: string
+  companyName: string | null
 }
 
 export interface IClientsPaginationLimited {
@@ -55,6 +62,9 @@ export interface ICreateClient {
       price: number
     }>
   }>
+  companyName?: string | null
+  pin?: string | null
+  street?: string | null
 }
 
 export interface IClientService {

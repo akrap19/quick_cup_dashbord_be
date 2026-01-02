@@ -192,6 +192,25 @@ const paths = {
       }
     }
   },
+  '/services/service-locations': {
+    get: {
+      tags: ['Services'],
+      description:
+        'Get all service locations formatted as "service name - service location name". Returns an array of objects where each object contains the service location id and a formatted name in the format "Service Name - City".',
+      responses: {
+        '200': {
+          description: 'Successfully retrieved all service locations',
+          content: {
+            'application/json': {
+              schema: {
+                $ref: '#/definitions/get_all_service_locations_response'
+              }
+            }
+          }
+        }
+      }
+    }
+  },
   '/services/{serviceId}/calculate-price': {
     post: {
       tags: ['Services'],
@@ -830,6 +849,35 @@ const definitions = {
           price: 450.0
         }
       },
+      code: 200000,
+      message: 'OK'
+    }
+  },
+  get_all_service_locations_response: {
+    type: 'object',
+    example: {
+      data: [
+        {
+          id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+          name: 'Delivery Service - New York'
+        },
+        {
+          id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
+          name: 'Delivery Service - Los Angeles'
+        },
+        {
+          id: 'c3d4e5f6-a7b8-9012-cdef-123456789012',
+          name: 'Storage Service - Chicago'
+        },
+        {
+          id: 'd4e5f6a7-b8c9-0123-def0-234567890123',
+          name: 'Family Counselling - Reykjavik'
+        },
+        {
+          id: 'e5f6a7b8-c9d0-1234-ef01-345678901234',
+          name: 'Family Counselling - Akureyri'
+        }
+      ],
       code: 200000,
       message: 'OK'
     }

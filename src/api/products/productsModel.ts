@@ -6,7 +6,7 @@ import {
   UpdateDateColumn,
   OneToMany
 } from 'typeorm'
-import { AcquisitionType } from './interface'
+import { AcquisitionType, ProductStatus } from './interface'
 import { ProductMedia } from './productsMediaModel'
 import { ProductPrice } from './productPriceModel'
 import { ProductState } from '../product_state/productStateModel'
@@ -43,6 +43,13 @@ export class Product {
     default: AcquisitionType.BUY
   })
   acquisitionType!: AcquisitionType
+
+  @Column({
+    type: 'enum',
+    enum: ProductStatus,
+    default: ProductStatus.ACTIVE
+  })
+  status!: ProductStatus
 
   @OneToMany(() => ProductMedia, (productMedia) => productMedia.product)
   images?: ProductMedia[]

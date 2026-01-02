@@ -6,6 +6,11 @@ export enum AcquisitionType {
   BUY = 'buy'
 }
 
+export enum ProductStatus {
+  ACTIVE = 'Active',
+  DELETED = 'Deleted'
+}
+
 export interface ICreateProduct extends IServiceMethod {
   name: string
   size?: string
@@ -33,7 +38,7 @@ export interface ICreateProduct extends IServiceMethod {
     status: string
     location: string
     quantity: number
-    serviceId?: string | null
+    serviceLocationId?: string | null
     userId?: string | null
   }>
 }
@@ -67,7 +72,7 @@ export interface IUpdateProduct extends IServiceMethod {
     status: string
     location: string
     quantity: number
-    serviceId?: string | null
+    serviceLocationId?: string | null
     userId?: string | null
   }>
 }
@@ -132,6 +137,20 @@ export interface IGetAllProductServicePrices extends IServiceMethod {
   productId: string
 }
 
+export interface ICalculateProductPrice extends IServiceMethod {
+  productId: string
+  quantity: number
+  userId: string
+}
+
+export interface ICalculatedProductPrice {
+  productId: string
+  quantity: number
+  unitPrice: number
+  totalPrice: number
+  priceSource: 'client' | 'product'
+}
+
 export interface IProductService {
   listProducts(params: IListProducts): AsyncResponse<IProductsPagination>
   getProductById(params: IGetProductById): AsyncResponse<Product>
@@ -144,4 +163,7 @@ export interface IProductService {
   getAllProductServicePrices(
     productId: string
   ): AsyncResponse<IAllProductServicePrices[]>
+  calculateProductPrice(
+    params: ICalculateProductPrice
+  ): AsyncResponse<ICalculatedProductPrice>
 }

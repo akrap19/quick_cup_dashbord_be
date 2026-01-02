@@ -16,6 +16,8 @@ import {
   ProductStateLocation
 } from './interface'
 import { ProductState } from './productStateModel'
+import { ServiceModel } from '../service/serviceModel'
+import { User } from '../user/userModel'
 
 type ListProductStatesResponse = Awaited<
   AsyncResponse<IProductStatesPagination>
@@ -163,21 +165,52 @@ export class ProductStateService implements IProductStateService {
     let code: ResponseCode = ResponseCode.OK
 
     try {
+      // Normalize empty strings to null
+      const normalizedServiceId =
+        serviceId && typeof serviceId === 'string' && serviceId.trim() !== ''
+          ? serviceId
+          : null
+      const normalizedUserId =
+        userId && typeof userId === 'string' && userId.trim() !== ''
+          ? userId
+          : null
+
       // Validate location-specific fields
-      if (location === ProductStateLocation.SERVICE && !serviceId) {
+      if (location === ProductStateLocation.SERVICE && !normalizedServiceId) {
         return { code: ResponseCode.INVALID_INPUT }
       }
-      if (location === ProductStateLocation.USER && !userId) {
+      if (location === ProductStateLocation.USER && !normalizedUserId) {
         return { code: ResponseCode.INVALID_INPUT }
       }
-      if (location === ProductStateLocation.SERVICE && userId) {
+      if (location === ProductStateLocation.SERVICE && normalizedUserId) {
         return { code: ResponseCode.INVALID_INPUT }
       }
-      if (location === ProductStateLocation.USER && serviceId) {
+      if (location === ProductStateLocation.USER && normalizedServiceId) {
         return { code: ResponseCode.INVALID_INPUT }
       }
 
       const manager = queryRunner ? queryRunner.manager : AppDataSource.manager
+
+      // Validate that referenced entities exist
+      if (location === ProductStateLocation.SERVICE && normalizedServiceId) {
+        const serviceRepository = manager.getRepository(ServiceModel)
+        const service = await serviceRepository.findOne({
+          where: { id: normalizedServiceId }
+        })
+        if (!service) {
+          return { code: ResponseCode.INVALID_INPUT }
+        }
+      }
+
+      if (location === ProductStateLocation.USER && normalizedUserId) {
+        const userRepository = manager.getRepository(User)
+        const user = await userRepository.findOne({
+          where: { id: normalizedUserId }
+        })
+        if (!user) {
+          return { code: ResponseCode.INVALID_INPUT }
+        }
+      }
 
       const repository = manager.getRepository(ProductState)
 
@@ -186,8 +219,11 @@ export class ProductStateService implements IProductStateService {
         location,
         quantity,
         productId,
-        serviceId: location === ProductStateLocation.SERVICE ? serviceId : null,
-        userId: location === ProductStateLocation.USER ? userId : null
+        serviceId:
+          location === ProductStateLocation.SERVICE
+            ? normalizedServiceId
+            : null,
+        userId: location === ProductStateLocation.USER ? normalizedUserId : null
       })
 
       const savedProductState = await repository.save(productState)
@@ -243,29 +279,63 @@ export class ProductStateService implements IProductStateService {
         return { code: ResponseCode.NOT_FOUND }
       }
 
+      // Normalize empty strings to null
+      const normalizedServiceId =
+        serviceId && typeof serviceId === 'string' && serviceId.trim() !== ''
+          ? serviceId
+          : null
+      const normalizedUserId =
+        userId && typeof userId === 'string' && userId.trim() !== ''
+          ? userId
+          : null
+
       // Determine the location to use (new or existing)
       const finalLocation = location ?? existingProductState.location
 
       // Validate location-specific fields
-      if (finalLocation === ProductStateLocation.SERVICE && userId) {
+      if (finalLocation === ProductStateLocation.SERVICE && normalizedUserId) {
         return { code: ResponseCode.INVALID_INPUT }
       }
-      if (finalLocation === ProductStateLocation.USER && serviceId) {
+      if (finalLocation === ProductStateLocation.USER && normalizedServiceId) {
         return { code: ResponseCode.INVALID_INPUT }
       }
       if (
         finalLocation === ProductStateLocation.SERVICE &&
-        !serviceId &&
+        !normalizedServiceId &&
         !existingProductState.serviceId
       ) {
         return { code: ResponseCode.INVALID_INPUT }
       }
       if (
         finalLocation === ProductStateLocation.USER &&
-        !userId &&
+        !normalizedUserId &&
         !existingProductState.userId
       ) {
         return { code: ResponseCode.INVALID_INPUT }
+      }
+
+      // Validate that referenced entities exist
+      const finalServiceId =
+        normalizedServiceId ?? existingProductState.serviceId
+      if (finalLocation === ProductStateLocation.SERVICE && finalServiceId) {
+        const serviceRepository = manager.getRepository(ServiceModel)
+        const service = await serviceRepository.findOne({
+          where: { id: finalServiceId }
+        })
+        if (!service) {
+          return { code: ResponseCode.INVALID_INPUT }
+        }
+      }
+
+      const finalUserId = normalizedUserId ?? existingProductState.userId
+      if (finalLocation === ProductStateLocation.USER && finalUserId) {
+        const userRepository = manager.getRepository(User)
+        const user = await userRepository.findOne({
+          where: { id: finalUserId }
+        })
+        if (!user) {
+          return { code: ResponseCode.INVALID_INPUT }
+        }
       }
 
       const updateData: Partial<ProductState> = {}
@@ -285,11 +355,10 @@ export class ProductStateService implements IProductStateService {
 
       // Update location-specific fields
       if (finalLocation === ProductStateLocation.SERVICE) {
-        updateData.serviceId =
-          serviceId ?? existingProductState.serviceId ?? null
+        updateData.serviceId = finalServiceId ?? null
         updateData.userId = null
       } else if (finalLocation === ProductStateLocation.USER) {
-        updateData.userId = userId ?? existingProductState.userId ?? null
+        updateData.userId = finalUserId ?? null
         updateData.serviceId = null
       }
 

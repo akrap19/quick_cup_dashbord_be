@@ -6,7 +6,8 @@ export enum ProductStateStatus {
   IN_USE = 'in_use',
   MAINTENANCE = 'maintenance',
   RESERVED = 'reserved',
-  DAMAGED = 'damaged'
+  DAMAGED = 'damaged',
+  OWNED_BY_CLIENT = 'owned_by_client'
 }
 
 export enum ProductStateLocation {

@@ -26,14 +26,21 @@ export const addClientSchema = (req: Request) => {
                 .items(
                   Joi.object({
                     minQuantity: Joi.number().integer().min(0).required(),
-                    maxQuantity: Joi.number().integer().min(0).allow(null).optional(),
+                    maxQuantity: Joi.number()
+                      .integer()
+                      .min(0)
+                      .allow(null)
+                      .optional(),
                     price: Joi.number().min(0).required()
                   })
                 )
                 .required()
             })
           )
-          .optional()
+          .optional(),
+        companyName: Joi.string().max(255).allow(null).optional(),
+        pin: Joi.string().max(50).allow(null).optional(),
+        street: Joi.string().max(255).allow(null).optional()
       })
       .options({ abortEarly: false }),
     input: {
@@ -42,7 +49,10 @@ export const addClientSchema = (req: Request) => {
       lastName: req.body.lastName,
       phoneNumber: req.body.phoneNumber,
       location: req.body.location,
-      productPrices: req.body.productPrices
+      productPrices: req.body.productPrices,
+      companyName: req.body.companyName,
+      pin: req.body.pin,
+      street: req.body.street
     }
   }
 }
@@ -129,14 +139,21 @@ export const editClientSchema = (req: Request) => {
                 .items(
                   Joi.object({
                     minQuantity: Joi.number().integer().min(0).required(),
-                    maxQuantity: Joi.number().integer().min(0).allow(null).optional(),
+                    maxQuantity: Joi.number()
+                      .integer()
+                      .min(0)
+                      .allow(null)
+                      .optional(),
                     price: Joi.number().min(0).required()
                   })
                 )
                 .required()
             })
           )
-          .optional()
+          .optional(),
+        companyName: Joi.string().max(255).allow(null).optional(),
+        pin: Joi.string().max(50).allow(null).optional(),
+        street: Joi.string().max(255).allow(null).optional()
       })
       .options({ abortEarly: false }),
     input: {
@@ -145,7 +162,10 @@ export const editClientSchema = (req: Request) => {
       lastName: req.body.lastName,
       phoneNumber: req.body.phoneNumber,
       location: req.body.location,
-      productPrices: req.body.productPrices
+      productPrices: req.body.productPrices,
+      companyName: req.body.companyName,
+      pin: req.body.pin,
+      street: req.body.street
     }
   }
 }

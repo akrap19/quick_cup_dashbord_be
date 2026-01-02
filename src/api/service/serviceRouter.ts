@@ -4,6 +4,7 @@ import {
   calculateServicePriceForMultipleProductsSchema,
   calculateServicePriceSchema,
   createServiceSchema,
+  getAllServiceLocationsSchema,
   getAllServicePricesSchema,
   listServicesSchema,
   serviceIdParamSchema,
@@ -33,6 +34,14 @@ serviceRouter.get(
   requireRole(adminRoles),
   validate(getAllServicePricesSchema),
   servicesController.getAllServicePrices
+)
+
+serviceRouter.get(
+  '/service-locations',
+  requireToken,
+  requireRole(adminRoles),
+  validate(getAllServiceLocationsSchema),
+  servicesController.getAllServiceLocations
 )
 
 serviceRouter.get(

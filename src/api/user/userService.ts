@@ -44,6 +44,9 @@ export class UserService implements IUserService {
     phoneNumber,
     email,
     location,
+    companyName,
+    pin,
+    street,
     queryRunner
   }: ICreateUser) => {
     let code: ResponseCode = ResponseCode.OK
@@ -53,7 +56,18 @@ export class UserService implements IUserService {
         .createQueryBuilder('user', queryRunner)
         .insert()
         .into(User)
-        .values([{ firstName, lastName, email, phoneNumber, location }])
+        .values([
+          {
+            firstName,
+            lastName,
+            email,
+            phoneNumber,
+            location,
+            companyName,
+            pin,
+            street
+          }
+        ])
         .execute()
 
       if (insertResult.raw.affectedRows !== 1) {
@@ -284,24 +298,31 @@ export class UserService implements IUserService {
     phoneNumber,
     status,
     location,
+    companyName,
+    pin,
+    street,
     queryRunner
   }: IEditUser) => {
     let code: ResponseCode = ResponseCode.OK
 
     try {
+      const updateData: any = {}
+      if (email !== undefined) updateData.email = email
+      if (newEmail !== undefined) updateData.newEmail = newEmail
+      if (password !== undefined) updateData.password = password
+      if (firstName !== undefined) updateData.firstName = firstName
+      if (lastName !== undefined) updateData.lastName = lastName
+      if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber
+      if (status !== undefined) updateData.status = status
+      if (location !== undefined) updateData.location = location
+      if (companyName !== undefined) updateData.companyName = companyName
+      if (pin !== undefined) updateData.pin = pin
+      if (street !== undefined) updateData.street = street
+
       await this.userRepository
         .createQueryBuilder('user', queryRunner)
         .update(User)
-        .set({
-          email,
-          newEmail,
-          password,
-          firstName,
-          lastName,
-          phoneNumber,
-          location: location as string | undefined,
-          status
-        })
+        .set(updateData)
         .where('user.id = :userId', { userId })
         .execute()
 

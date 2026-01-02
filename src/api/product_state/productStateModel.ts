@@ -9,6 +9,7 @@ import {
 } from 'typeorm'
 import { Product } from '../products/productsModel'
 import { ServiceModel } from '../service/serviceModel'
+import { ServiceLocationModel } from '../service_location/serviceLocationModel'
 import { User } from '../user/userModel'
 import { ProductStateLocation, ProductStateStatus } from './interface'
 
@@ -47,6 +48,16 @@ export class ProductState {
   service?: ServiceModel | null
 
   @Column({ type: 'uuid', nullable: true })
+  serviceLocationId?: string | null
+
+  @ManyToOne(() => ServiceLocationModel, {
+    onDelete: 'SET NULL',
+    nullable: true
+  })
+  @JoinColumn({ name: 'service_location_id' })
+  serviceLocation?: ServiceLocationModel | null
+
+  @Column({ type: 'uuid', nullable: true })
   userId?: string | null
 
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
@@ -74,6 +85,7 @@ export class ProductState {
     quantity: number,
     productId: string,
     serviceId?: string | null,
+    serviceLocationId?: string | null,
     userId?: string | null
   ) {
     this.status = status
@@ -81,6 +93,7 @@ export class ProductState {
     this.quantity = quantity
     this.productId = productId
     this.serviceId = serviceId
+    this.serviceLocationId = serviceLocationId
     this.userId = userId
   }
 }

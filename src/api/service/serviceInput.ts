@@ -227,3 +227,10 @@ export const calculateServicePriceForMultipleProductsSchema = (
     }
   }
 }
+
+export const getAllServiceLocationsSchema = (req: Request) => {
+  return {
+    schema: Joi.object().keys({}).options({ abortEarly: false }),
+    input: {}
+  }
+}

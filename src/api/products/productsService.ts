@@ -8,6 +8,8 @@ import { getResponseMessage } from '../../services/utils'
 import {
   AcquisitionType,
   IAllProductPrices,
+  ICalculateProductPrice,
+  ICalculatedProductPrice,
   ICreateProduct,
   IDeleteProduct,
   IGetAllProductPrices,
@@ -15,7 +17,8 @@ import {
   IListProducts,
   IProductService,
   IProductsPagination,
-  IUpdateProduct
+  IUpdateProduct,
+  ProductStatus
 } from './interface'
 import { Product } from './productsModel'
 import { ProductMedia } from './productsMediaModel'
@@ -33,6 +36,8 @@ import {
   AcquisitionType as ServiceAcquisitionType
 } from '../service/serviceModel'
 import { ServicePrice } from '../service/servicePriceModel'
+import { ServiceLocationModel } from '../service_location/serviceLocationModel'
+import { User } from '../user/userModel'
 import { getFileURL, deleteFile } from '../../services/cpanel'
 
 type ListProductsResponse = Awaited<AsyncResponse<IProductsPagination>>
@@ -50,6 +55,7 @@ export class ProductsService implements IProductService {
   private readonly serviceRepository: Repository<ServiceModel>
   private readonly servicePriceRepository: Repository<ServicePrice>
   private readonly productStateRepository: Repository<ProductState>
+  private readonly userRepository: Repository<User>
 
   constructor() {
     this.productRepository = AppDataSource.manager.getRepository(Product)
@@ -67,6 +73,7 @@ export class ProductsService implements IProductService {
       AppDataSource.manager.getRepository(ServicePrice)
     this.productStateRepository =
       AppDataSource.manager.getRepository(ProductState)
+    this.userRepository = AppDataSource.manager.getRepository(User)
   }
 
   private validatePriceTiers(
@@ -128,7 +135,11 @@ export class ProductsService implements IProductService {
         ? queryRunner.manager.getRepository(Product)
         : this.productRepository
 
-      const query = repository.createQueryBuilder('product')
+      const query = repository
+        .createQueryBuilder('product')
+        .andWhere('product.status != :deletedStatus', {
+          deletedStatus: ProductStatus.DELETED
+        })
 
       if (typeof acquisitionType === 'string') {
         query.andWhere('product.acquisitionType = :acquisitionType', {
@@ -149,6 +160,10 @@ export class ProductsService implements IProductService {
         .leftJoinAndSelect('product.prices', 'prices')
         .leftJoinAndSelect('product.productStates', 'productStates')
         .leftJoinAndSelect('productStates.service', 'stateService')
+        .leftJoinAndSelect(
+          'productStates.serviceLocation',
+          'stateServiceLocation'
+        )
         .leftJoinAndSelect('productStates.user', 'stateUser')
         .orderBy('product.createdAt', 'DESC')
         .addOrderBy('prices.minQuantity', 'ASC')
@@ -303,11 +318,14 @@ export class ProductsService implements IProductService {
                 status: state.status,
                 location: state.location,
                 quantity: state.quantity,
-                serviceId: state.serviceId ?? null,
-                service: state.service
+                serviceLocationId: state.serviceLocationId ?? null,
+                serviceLocation: state.serviceLocation
                   ? {
-                      id: state.service.id,
-                      name: state.service.name
+                      id: state.serviceLocation.id,
+                      city: state.serviceLocation.city,
+                      address: state.serviceLocation.address,
+                      email: state.serviceLocation.email,
+                      phone: state.serviceLocation.phone
                     }
                   : null,
                 userId: state.userId ?? null,
@@ -369,13 +387,15 @@ export class ProductsService implements IProductService {
         : this.productRepository
 
       const product = await repository.findOne({
-        where: { id: productId },
+        where: { id: productId, status: ProductStatus.ACTIVE },
         relations: [
           'images',
           'images.media',
           'prices',
           'productStates',
           'productStates.service',
+          'productStates.serviceLocation',
+          'productStates.serviceLocation.service',
           'productStates.user'
         ]
       })
@@ -505,11 +525,15 @@ export class ProductsService implements IProductService {
             status: state.status,
             location: state.location,
             quantity: state.quantity,
-            serviceId: state.serviceId ?? null,
-            service: state.service
+            serviceLocationId: state.serviceLocationId ?? null,
+            serviceLocation: state.serviceLocation
               ? {
-                  id: state.service.id,
-                  name: state.service.name
+                  id: state.serviceLocation.id,
+                  city: state.serviceLocation.city,
+                  address: state.serviceLocation.address,
+                  email: state.serviceLocation.email,
+                  phone: state.serviceLocation.phone,
+                  serviceName: state.serviceLocation.service?.name ?? null
                 }
               : null,
             userId: state.userId ?? null,
@@ -518,7 +542,8 @@ export class ProductsService implements IProductService {
                   id: state.user.id,
                   firstName: state.user.firstName,
                   lastName: state.user.lastName,
-                  email: state.user.email
+                  email: state.user.email,
+                  companyName: state.user.companyName ?? null
                 }
               : null,
             createdAt: state.createdAt,
@@ -653,15 +678,19 @@ export class ProductsService implements IProductService {
 
       // Create product states if provided
       if (productStates && productStates.length > 0) {
-        const productStateRepository = queryRunner
-          ? queryRunner.manager.getRepository(ProductState)
-          : this.productStateRepository
+        const manager = queryRunner
+          ? queryRunner.manager
+          : AppDataSource.manager
+        const productStateRepository = manager.getRepository(ProductState)
+        const serviceLocationRepository =
+          manager.getRepository(ServiceLocationModel)
+        const userRepository = manager.getRepository(User)
 
         for (const state of productStates) {
           // Validate location-specific fields
           if (
             state.location === ProductStateLocation.SERVICE &&
-            !state.serviceId
+            !state.serviceLocationId
           ) {
             return { code: ResponseCode.INVALID_INPUT }
           }
@@ -671,8 +700,33 @@ export class ProductsService implements IProductService {
           if (state.location === ProductStateLocation.SERVICE && state.userId) {
             return { code: ResponseCode.INVALID_INPUT }
           }
-          if (state.location === ProductStateLocation.USER && state.serviceId) {
+          if (
+            state.location === ProductStateLocation.USER &&
+            state.serviceLocationId
+          ) {
             return { code: ResponseCode.INVALID_INPUT }
+          }
+
+          // Validate that referenced entities exist
+          if (
+            state.location === ProductStateLocation.SERVICE &&
+            state.serviceLocationId
+          ) {
+            const serviceLocation = await serviceLocationRepository.findOne({
+              where: { id: state.serviceLocationId }
+            })
+            if (!serviceLocation) {
+              return { code: ResponseCode.INVALID_INPUT }
+            }
+          }
+
+          if (state.location === ProductStateLocation.USER && state.userId) {
+            const user = await userRepository.findOne({
+              where: { id: state.userId }
+            })
+            if (!user) {
+              return { code: ResponseCode.INVALID_INPUT }
+            }
           }
 
           const productState = productStateRepository.create({
@@ -680,9 +734,9 @@ export class ProductsService implements IProductService {
             location: state.location as ProductStateLocation,
             quantity: state.quantity,
             productId: savedProduct.id,
-            serviceId:
+            serviceLocationId:
               state.location === ProductStateLocation.SERVICE
-                ? state.serviceId
+                ? state.serviceLocationId
                 : null,
             userId:
               state.location === ProductStateLocation.USER ? state.userId : null
@@ -757,6 +811,7 @@ export class ProductsService implements IProductService {
           'prices',
           'productStates',
           'productStates.service',
+          'productStates.serviceLocation',
           'productStates.user'
         ]
       })
@@ -795,11 +850,14 @@ export class ProductsService implements IProductService {
             status: state.status,
             location: state.location,
             quantity: state.quantity,
-            serviceId: state.serviceId ?? null,
-            service: state.service
+            serviceLocationId: state.serviceLocationId ?? null,
+            serviceLocation: state.serviceLocation
               ? {
-                  id: state.service.id,
-                  name: state.service.name
+                  id: state.serviceLocation.id,
+                  city: state.serviceLocation.city,
+                  address: state.serviceLocation.address,
+                  email: state.serviceLocation.email,
+                  phone: state.serviceLocation.phone
                 }
               : null,
             userId: state.userId ?? null,
@@ -860,8 +918,10 @@ export class ProductsService implements IProductService {
         ? queryRunner.manager.getRepository(Product)
         : this.productRepository
 
-      // Verify product exists
-      const product = await repository.findOne({ where: { id: productId } })
+      // Verify product exists and is not deleted
+      const product = await repository.findOne({
+        where: { id: productId, status: ProductStatus.ACTIVE }
+      })
       if (!product) {
         return { code: ResponseCode.NOT_FOUND }
       }
@@ -1213,9 +1273,13 @@ export class ProductsService implements IProductService {
 
       // Handle product states if provided
       if (productStates !== undefined) {
-        const productStateRepository = queryRunner
-          ? queryRunner.manager.getRepository(ProductState)
-          : this.productStateRepository
+        const manager = queryRunner
+          ? queryRunner.manager
+          : AppDataSource.manager
+        const productStateRepository = manager.getRepository(ProductState)
+        const serviceLocationRepository =
+          manager.getRepository(ServiceLocationModel)
+        const userRepository = manager.getRepository(User)
 
         // Delete all existing product states for this product
         await productStateRepository.delete({ productId })
@@ -1226,7 +1290,7 @@ export class ProductsService implements IProductService {
             // Validate location-specific fields
             if (
               state.location === ProductStateLocation.SERVICE &&
-              !state.serviceId
+              !state.serviceLocationId
             ) {
               return { code: ResponseCode.INVALID_INPUT }
             }
@@ -1241,9 +1305,31 @@ export class ProductsService implements IProductService {
             }
             if (
               state.location === ProductStateLocation.USER &&
-              state.serviceId
+              state.serviceLocationId
             ) {
               return { code: ResponseCode.INVALID_INPUT }
+            }
+
+            // Validate that referenced entities exist
+            if (
+              state.location === ProductStateLocation.SERVICE &&
+              state.serviceLocationId
+            ) {
+              const serviceLocation = await serviceLocationRepository.findOne({
+                where: { id: state.serviceLocationId }
+              })
+              if (!serviceLocation) {
+                return { code: ResponseCode.INVALID_INPUT }
+              }
+            }
+
+            if (state.location === ProductStateLocation.USER && state.userId) {
+              const user = await userRepository.findOne({
+                where: { id: state.userId }
+              })
+              if (!user) {
+                return { code: ResponseCode.INVALID_INPUT }
+              }
             }
 
             const productState = productStateRepository.create({
@@ -1251,9 +1337,9 @@ export class ProductsService implements IProductService {
               location: state.location as ProductStateLocation,
               quantity: state.quantity,
               productId,
-              serviceId:
+              serviceLocationId:
                 state.location === ProductStateLocation.SERVICE
-                  ? state.serviceId
+                  ? state.serviceLocationId
                   : null,
               userId:
                 state.location === ProductStateLocation.USER
@@ -1353,84 +1439,25 @@ export class ProductsService implements IProductService {
         ? queryRunner.manager.getRepository(Product)
         : this.productRepository
 
-      // First, fetch the product with its images and media to get file paths
+      // First, fetch the product to verify it exists and is not already deleted
       const product = await repository.findOne({
-        where: { id: productId },
-        relations: ['images', 'images.media']
+        where: { id: productId, status: ProductStatus.ACTIVE }
       })
 
       if (!product) {
         return { code: ResponseCode.NOT_FOUND }
       }
 
-      // Delete all custom prices for this product related to customers
-      const clientProductPriceRepository = queryRunner
-        ? queryRunner.manager.getRepository(ClientProductPrice)
-        : this.clientProductPriceRepository
-
-      const deleteClientPricesResult = await clientProductPriceRepository
-        .createQueryBuilder()
-        .delete()
-        .from(ClientProductPrice)
-        .where('product_id = :productId', { productId })
-        .execute()
+      // Update product status to DELETED instead of actually deleting it
+      await repository.update(
+        { id: productId },
+        { status: ProductStatus.DELETED }
+      )
 
       logger.info({
-        message: `Deleted client product prices for product`,
-        productId,
-        deletedCount: deleteClientPricesResult.affected || 0
+        message: `Product marked as deleted`,
+        productId
       })
-
-      // Delete associated image files from server
-      if (product.images && product.images.length > 0) {
-        const productMediaRepository = queryRunner
-          ? queryRunner.manager.getRepository(ProductMedia)
-          : this.productMediaRepository
-
-        // Get all media IDs associated with this product
-        const mediaIds = product.images.map((img) => img.mediaId)
-
-        // Check which media are used by other products
-        const mediaUsedByOtherProducts = await productMediaRepository
-          .createQueryBuilder('pm')
-          .where('pm.media_id IN (:...mediaIds)', { mediaIds })
-          .andWhere('pm.product_id != :productId', { productId })
-          .getMany()
-
-        const mediaIdsUsedByOthers = new Set(
-          mediaUsedByOtherProducts.map((pm) => pm.mediaId)
-        )
-
-        // Delete files for media that are not used by other products
-        for (const img of product.images) {
-          if (!mediaIdsUsedByOthers.has(img.mediaId) && img.media?.url) {
-            try {
-              await deleteFile(img.media.url)
-              logger.info({
-                message: `Deleted file from server: ${img.media.url}`,
-                productId,
-                mediaId: img.mediaId
-              })
-            } catch (fileErr: any) {
-              // Log error but don't fail the deletion
-              logger.error({
-                code: ResponseCode.SERVER_ERROR,
-                message: `Failed to delete file from server: ${img.media.url}`,
-                stack: fileErr.stack,
-                productId,
-                mediaId: img.mediaId
-              })
-            }
-          }
-        }
-      }
-
-      // Delete the product (this will cascade delete ProductMedia records)
-      const result = await repository.delete({ id: productId })
-
-      if (!result.affected) {
-        return { code: ResponseCode.NOT_FOUND }
-      }
 
       return { code } as unknown as DeleteProductResponse
     } catch (err: any) {
@@ -1454,6 +1481,9 @@ export class ProductsService implements IProductService {
       const query = this.productPriceRepository
         .createQueryBuilder('price')
         .leftJoinAndSelect('price.product', 'product')
+        .where('product.status != :deletedStatus', {
+          deletedStatus: ProductStatus.DELETED
+        })
         .orderBy('price.productId', 'ASC')
         .addOrderBy('price.minQuantity', 'ASC')
 
@@ -1528,7 +1558,7 @@ export class ProductsService implements IProductService {
     try {
       // First, get the product to know its acquisition type
       const product = await this.productRepository.findOne({
-        where: { id: productId }
+        where: { id: productId, status: ProductStatus.ACTIVE }
       })
 
       if (!product) {
@@ -1630,6 +1660,105 @@ export class ProductsService implements IProductService {
 
       return {
         data: result,
+        code
+      }
+    } catch (err: any) {
+      code = ResponseCode.SERVER_ERROR
+      logger.error({
+        code,
+        message: getResponseMessage(code),
+        stack: err.stack
+      })
+      return { code }
+    }
+  }
+
+  calculateProductPrice = async ({
+    productId,
+    quantity,
+    userId
+  }: ICalculateProductPrice): AsyncResponse<ICalculatedProductPrice> => {
+    let code: ResponseCode = ResponseCode.OK
+
+    try {
+      // Verify product exists
+      const product = await this.productRepository.findOne({
+        where: { id: productId }
+      })
+
+      if (!product) {
+        return { code: ResponseCode.NOT_FOUND }
+      }
+
+      // First, try to get client product prices
+      const clientPrices = await this.clientProductPriceRepository.find({
+        where: {
+          clientId: userId,
+          productId: productId
+        },
+        order: { minQuantity: 'DESC' }
+      })
+
+      let price: number | null = null
+      let priceSource: 'client' | 'product' = 'product'
+
+      // If client has prices, find the matching tier (most specific one - highest minQuantity)
+      if (clientPrices.length > 0) {
+        for (const clientPrice of clientPrices) {
+          const matchesMin = quantity >= clientPrice.minQuantity
+          const matchesMax =
+            clientPrice.maxQuantity === null ||
+            clientPrice.maxQuantity === undefined ||
+            quantity <= clientPrice.maxQuantity
+
+          if (matchesMin && matchesMax) {
+            price = clientPrice.price
+            priceSource = 'client'
+            break
+          }
+        }
+      }
+
+      // If no client price found, check product default prices
+      if (price === null) {
+        const productPrices = await this.productPriceRepository.find({
+          where: {
+            productId: productId
+          },
+          order: { minQuantity: 'DESC' }
+        })
+
+        for (const productPrice of productPrices) {
+          const matchesMin = quantity >= productPrice.minQuantity
+          const matchesMax =
+            productPrice.maxQuantity === null ||
+            productPrice.maxQuantity === undefined ||
+            quantity <= productPrice.maxQuantity
+
+          if (matchesMin && matchesMax) {
+            price = productPrice.price
+            priceSource = 'product'
+            break
+          }
+        }
+      }
+
+      // If no price found, return error
+      if (price === null) {
+        return { code: ResponseCode.NOT_FOUND }
+      }
+
+      // Calculate total price (unit price * quantity)
+      const totalPrice = price * quantity
+
+      return {
+        data: {
+          productId,
+          quantity,
+          unitPrice: price,
+          totalPrice,
+          priceSource
+        },
         code
       }
     } catch (err: any) {

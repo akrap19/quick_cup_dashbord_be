@@ -18,6 +18,7 @@ import { ClientProductPrice } from './clientProductPriceModel'
 import { ProductsService } from '../products/productsService'
 import { ProductPrice } from '../products/productPriceModel'
 import { Product } from '../products/productsModel'
+import { ProductStatus, AcquisitionType } from '../products/interface'
 
 @autoInjectable()
 export class ClientService implements IClientService {
@@ -95,7 +96,10 @@ export class ClientService implements IClientService {
     phoneNumber,
     location,
     assignedById,
-    productPrices
+    productPrices,
+    companyName,
+    pin,
+    street
   }: ICreateClient) => {
     let code: ResponseCode = ResponseCode.OK
     const queryRunner = AppDataSource.createQueryRunner()
@@ -118,6 +122,9 @@ export class ClientService implements IClientService {
             email,
             phoneNumber,
             location,
+            companyName,
+            pin,
+            street,
             queryRunner
           })
         if (!newUser) {
@@ -153,7 +160,10 @@ export class ClientService implements IClientService {
           userId: existingUser.id,
           firstName,
           lastName,
-          phoneNumber
+          phoneNumber,
+          companyName,
+          pin,
+          street
         })
 
         if (editCode != ResponseCode.OK) {
@@ -244,7 +254,10 @@ export class ClientService implements IClientService {
     lastName,
     phoneNumber,
     location,
-    productPrices
+    productPrices,
+    companyName,
+    pin,
+    street
   }: IEditUser) => {
     let code: ResponseCode = ResponseCode.OK
     const queryRunner = AppDataSource.createQueryRunner()
@@ -258,7 +271,10 @@ export class ClientService implements IClientService {
         firstName,
         lastName,
         phoneNumber,
-        location: location as string | null
+        location: location as string | null,
+        companyName,
+        pin,
+        street
       })
 
       if (editUserCode != ResponseCode.OK) {
@@ -382,8 +398,12 @@ export class ClientService implements IClientService {
     let code: ResponseCode = ResponseCode.OK
 
     try {
-      // Get all products with their default prices
+      // Get all products with their default prices (excluding deleted, only buy products)
       const allProducts = await this.productRepository.find({
+        where: {
+          status: ProductStatus.ACTIVE,
+          acquisitionType: AcquisitionType.BUY
+        },
         relations: ['prices'],
         order: { id: 'ASC' }
       })

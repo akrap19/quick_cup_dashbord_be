@@ -168,6 +168,45 @@ const paths = {
         }
       }
     }
+  },
+  '/products/calculate-price': {
+    post: {
+      tags: ['Products'],
+      description:
+        'Calculate the total price for a product based on quantity and user. First checks client-specific product prices, then falls back to default product prices. Finds the unit price that matches the quantity range (e.g., if quantity is 800 and prices are defined as 1-500: 1.4, 501-1000: 1.3, it uses 1.3) and returns the total price (unit price * quantity).',
+      requestBody: {
+        content: {
+          'application/json': {
+            schema: {
+              $ref: '#/definitions/calculate_product_price_body'
+            }
+          }
+        }
+      },
+      responses: {
+        '200': {
+          description: 'Successfully calculated product price',
+          content: {
+            'application/json': {
+              schema: {
+                $ref: '#/definitions/calculate_product_price_response'
+              }
+            }
+          }
+        },
+        '404': {
+          description:
+            'Product not found or no price tier matches the quantity',
+          content: {
+            'application/json': {
+              schema: {
+                $ref: '#/definitions/user_not_found_response'
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }
 
@@ -322,12 +361,12 @@ const definitions = {
               minimum: 0,
               description: 'Quantity of products in this state'
             },
-            serviceId: {
+            serviceLocationId: {
               type: 'string',
               format: 'uuid',
               nullable: true,
               description:
-                'Service ID (required when location is "service", must be null when location is "user")'
+                'Service Location ID (required when location is "service", must be null when location is "user")'
             },
             userId: {
               type: 'string',
@@ -393,14 +432,14 @@ const definitions = {
           status: 'available',
           location: 'service',
           quantity: 10,
-          serviceId: '83d0de32-41a0-4474-b93b-78c8e96e31a6',
+          serviceLocationId: '83d0de32-41a0-4474-b93b-78c8e96e31a6',
           userId: null
         },
         {
           status: 'in_use',
           location: 'user',
           quantity: 5,
-          serviceId: null,
+          serviceLocationId: null,
           userId: '123e4567-e89b-12d3-a456-426614174000'
         }
       ]
@@ -563,12 +602,12 @@ const definitions = {
               minimum: 0,
               description: 'Quantity of products in this state'
             },
-            serviceId: {
+            serviceLocationId: {
               type: 'string',
               format: 'uuid',
               nullable: true,
               description:
-                'Service ID (required when location is "service", must be null when location is "user")'
+                'Service Location ID (required when location is "service", must be null when location is "user")'
             },
             userId: {
               type: 'string',
@@ -635,14 +674,14 @@ const definitions = {
           status: 'available',
           location: 'service',
           quantity: 15,
-          serviceId: '83d0de32-41a0-4474-b93b-78c8e96e31a6',
+          serviceLocationId: '83d0de32-41a0-4474-b93b-78c8e96e31a6',
           userId: null
         },
         {
           status: 'reserved',
           location: 'user',
           quantity: 3,
-          serviceId: null,
+          serviceLocationId: null,
           userId: '123e4567-e89b-12d3-a456-426614174000'
         }
       ]
@@ -724,6 +763,46 @@ const definitions = {
       data: null,
       code: 404000,
       message: 'Not Found'
+    }
+  },
+  calculate_product_price_body: {
+    type: 'object',
+    required: ['productId', 'quantity', 'userId'],
+    properties: {
+      productId: {
+        type: 'string',
+        format: 'uuid',
+        description: 'Product ID'
+      },
+      quantity: {
+        type: 'integer',
+        minimum: 1,
+        description: 'Quantity of products to calculate price for'
+      },
+      userId: {
+        type: 'string',
+        format: 'uuid',
+        description: 'User ID (client ID) to check for client-specific prices'
+      }
+    },
+    example: {
+      productId: '83d0de32-41a0-4474-b93b-78c8e96e31a6',
+      quantity: 800,
+      userId: '123e4567-e89b-12d3-a456-426614174000'
+    }
+  },
+  calculate_product_price_response: {
+    type: 'object',
+    example: {
+      data: {
+        productId: '83d0de32-41a0-4474-b93b-78c8e96e31a6',
+        quantity: 800,
+        unitPrice: 1.3,
+        totalPrice: 1040.0,
+        priceSource: 'client'
+      },
+      code: 200000,
+      message: 'OK'
     }
   }
 }

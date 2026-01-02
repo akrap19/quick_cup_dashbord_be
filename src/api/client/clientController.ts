@@ -16,8 +16,17 @@ export class ClientController {
   }
 
   addClient = async (req: Request, res: Response, next: NextFunction) => {
-    const { email, firstName, lastName, phoneNumber, location, productPrices } =
-      res.locals.input
+    const {
+      email,
+      firstName,
+      lastName,
+      phoneNumber,
+      location,
+      productPrices,
+      companyName,
+      pin,
+      street
+    } = res.locals.input
     const { id } = req.user
     const { user, code } = await this.userService.getUserById({
       userId: id,
@@ -34,7 +43,10 @@ export class ClientController {
       phoneNumber,
       location,
       assignedById: id,
-      productPrices
+      productPrices,
+      companyName,
+      pin,
+      street
     })
 
     return next({ code: clientCode })
@@ -57,8 +69,9 @@ export class ClientController {
         userId: user.id,
         name: user.firstName + ' ' + user.lastName,
         email: user.email,
-        phoneNumber: user.phoneNumber,
-        status: user.status
+        phoneNumber: user.phoneNumber ?? null,
+        status: user.status,
+        companyName: user.companyName || null
       }
     })
 
@@ -100,7 +113,10 @@ export class ClientController {
       status: user.status,
       assignedBy:
         client?.assignedBy?.firstName + ' ' + client?.assignedBy?.lastName,
-      productPrices: productPrices || []
+      productPrices: productPrices || [],
+      companyName: user.companyName || null,
+      pin: user.pin || null,
+      street: user.street || null
     }
 
     return next({ data: clientData, code })
@@ -131,8 +147,17 @@ export class ClientController {
   }
 
   editClient = async (req: Request, res: Response, next: NextFunction) => {
-    const { userId, firstName, lastName, phoneNumber, location, productPrices } =
-      res.locals.input
+    const {
+      userId,
+      firstName,
+      lastName,
+      phoneNumber,
+      location,
+      productPrices,
+      companyName,
+      pin,
+      street
+    } = res.locals.input
 
     const { code } = await this.clientService.editClient({
       userId,
@@ -140,7 +165,10 @@ export class ClientController {
       lastName,
       phoneNumber,
       location,
-      productPrices
+      productPrices,
+      companyName,
+      pin,
+      street
     })
 
     return next({ code })

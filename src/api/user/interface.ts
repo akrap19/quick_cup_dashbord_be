@@ -33,6 +33,9 @@ export interface ICreateUser extends IServiceMethod {
   email: string
   phoneNumber?: string
   location?: string
+  companyName?: string | null
+  pin?: string | null
+  street?: string | null
 }
 
 export interface IGetUserById extends IServiceMethod {
@@ -60,6 +63,12 @@ export interface IEditUser extends IServiceMethod {
   phoneNumber?: string | null
   location?: string | null
   status?: UserStatus
+  companyName?: string | null
+  pin?: string | null
+  street?: string | null
+  streetNumber?: string | null
+  city?: string | null
+  postalCode?: string | null
 }
 
 export interface IEditUserPassword {

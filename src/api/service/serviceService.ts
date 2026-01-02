@@ -14,8 +14,10 @@ import {
   ICreateService,
   IDeleteService,
   IGetAllServicePrices,
+  IGetAllServiceLocations,
   IGetServiceById,
   IListServices,
+  IServiceLocationItem,
   IServiceService,
   IServicesPagination,
   IUpdateService
@@ -26,6 +28,7 @@ import { ServiceLocationModel } from '../service_location/serviceLocationModel'
 import { ServicePrice } from './servicePriceModel'
 import { Product } from '../products/productsModel'
 import { ProductServicePrice } from '../products/productServicePriceModel'
+import { ProductStatus } from '../products/interface'
 
 type ListServicesResponse = Awaited<
   AsyncResponse<IServicesPagination<ServiceModel>>
@@ -841,9 +844,9 @@ export class ServicesService implements IServiceService<ServiceModel> {
         return { code: ResponseCode.NOT_FOUND }
       }
 
-      // Get product
+      // Get product (excluding deleted)
       const product = await productRepository.findOne({
-        where: { id: productId }
+        where: { id: productId, status: ProductStatus.ACTIVE }
       })
 
       if (!product) {
@@ -991,10 +994,10 @@ export class ServicesService implements IServiceService<ServiceModel> {
         return { code: ResponseCode.NOT_FOUND }
       }
 
-      // Get all products
+      // Get all products (excluding deleted)
       const productIds = products.map((p) => p.productId)
       const fetchedProducts = await productRepository.find({
-        where: { id: In(productIds) }
+        where: { id: In(productIds), status: ProductStatus.ACTIVE }
       })
 
       if (fetchedProducts.length !== productIds.length) {
@@ -1146,5 +1149,44 @@ export class ServicesService implements IServiceService<ServiceModel> {
     return {
       code
     } as unknown as CalculateServicePriceForMultipleProductsResponse
+  }
+
+  getAllServiceLocations = async ({
+    queryRunner
+  }: IGetAllServiceLocations = {}): AsyncResponse<IServiceLocationItem[]> => {
+    let code: ResponseCode = ResponseCode.OK
+
+    try {
+      const repository = queryRunner
+        ? queryRunner.manager.getRepository(ServiceLocationModel)
+        : this.serviceLocationRepository
+
+      const serviceLocations = await repository.find({
+        relations: ['service'],
+        order: { createdAt: 'DESC' }
+      })
+
+      const formattedLocations: IServiceLocationItem[] = serviceLocations.map(
+        (location) => {
+          const serviceName = location.service?.name || 'Unknown Service'
+          const locationName = location.city || 'Unknown Location'
+          return {
+            id: location.id,
+            name: `${serviceName} - ${locationName}`
+          }
+        }
+      )
+
+      return { data: formattedLocations, code }
+    } catch (err: any) {
+      code = ResponseCode.SERVER_ERROR
+      logger.error({
+        code,
+        message: getResponseMessage(code),
+        stack: err.stack
+      })
+    }
+
+    return { code } as unknown as AsyncResponse<IServiceLocationItem[]>
   }
 }

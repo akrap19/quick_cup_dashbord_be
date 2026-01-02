@@ -177,4 +177,25 @@ export class ProductsController {
 
     return next({ data, code })
   }
+
+  calculateProductPrice = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const input = res.locals.input ?? {}
+    const { productId, quantity, userId } = input
+
+    const { data, code } = await this.productsService.calculateProductPrice({
+      productId,
+      quantity,
+      userId
+    })
+
+    if (!data) {
+      return next({ code })
+    }
+
+    return next({ data, code })
+  }
 }

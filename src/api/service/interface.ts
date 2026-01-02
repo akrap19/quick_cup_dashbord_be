@@ -150,6 +150,13 @@ export interface ICalculateServicePriceForMultipleProductsResponse {
   }
 }
 
+export interface IGetAllServiceLocations extends IServiceMethod {}
+
+export interface IServiceLocationItem {
+  id: string
+  name: string
+}
+
 export interface IServiceService<T = unknown> {
   listServices(params: IListServices): AsyncResponse<IServicesPagination<T>>
   getServiceById(params: IGetServiceById): AsyncResponse<T>
@@ -165,4 +172,7 @@ export interface IServiceService<T = unknown> {
   calculateServicePriceForMultipleProducts(
     params: ICalculateServicePriceForMultipleProducts
   ): AsyncResponse<ICalculateServicePriceForMultipleProductsResponse>
+  getAllServiceLocations(
+    params?: IGetAllServiceLocations
+  ): AsyncResponse<IServiceLocationItem[]>
 }

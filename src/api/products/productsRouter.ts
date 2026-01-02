@@ -6,6 +6,7 @@ import { validate } from '../../middleware/validation'
 import { RoleType } from '../role/interface'
 import { ProductsController } from './productsController'
 import {
+  calculateProductPriceSchema,
   createProductSchema,
   getAllProductPricesSchema,
   getAllProductServicePricesSchema,
@@ -73,4 +74,12 @@ productsRouter.get(
   requireRole(adminRoles),
   validate(getAllProductServicePricesSchema),
   productsController.getAllProductServicePrices
+)
+
+productsRouter.post(
+  '/calculate-price',
+  requireToken,
+  requireRole(adminRoles),
+  validate(calculateProductPriceSchema),
+  productsController.calculateProductPrice
 )

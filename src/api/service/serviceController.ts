@@ -199,4 +199,18 @@ export class ServicesController {
 
     return next({ data, code })
   }
+
+  getAllServiceLocations = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const { data, code } = await this.servicesService.getAllServiceLocations()
+
+    if (!data) {
+      return next({ code })
+    }
+
+    return next({ data, code })
+  }
 }

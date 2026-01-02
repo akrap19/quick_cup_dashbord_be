@@ -36,6 +36,15 @@ export class User {
   @Column({ type: 'varchar', length: 255, nullable: true })
   location?: string
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  companyName?: string | null
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  pin?: string | null
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  street?: string | null
+
   @Column({ type: 'enum', enum: UserStatus, default: UserStatus.CREATED })
   status!: UserStatus
 

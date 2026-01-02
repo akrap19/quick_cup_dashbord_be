@@ -35,7 +35,7 @@ const productStateSchema = Joi.object({
     .valid(ProductStateLocation.SERVICE, ProductStateLocation.USER)
     .required(),
   quantity: Joi.number().integer().min(0).required(),
-  serviceId: uuidSchema
+  serviceLocationId: uuidSchema
     .when('location', {
       is: ProductStateLocation.SERVICE,
       then: Joi.required(),
@@ -48,9 +48,9 @@ const productStateSchema = Joi.object({
       otherwise: Joi.allow(null).optional()
     })
 }).custom((value, helpers) => {
-  if (value.location === ProductStateLocation.SERVICE && !value.serviceId) {
+  if (value.location === ProductStateLocation.SERVICE && !value.serviceLocationId) {
     return helpers.error('any.custom', {
-      message: 'serviceId is required when location is service'
+      message: 'serviceLocationId is required when location is service'
     })
   }
   if (value.location === ProductStateLocation.USER && !value.userId) {
@@ -63,9 +63,9 @@ const productStateSchema = Joi.object({
       message: 'userId must not be provided when location is service'
     })
   }
-  if (value.location === ProductStateLocation.USER && value.serviceId) {
+  if (value.location === ProductStateLocation.USER && value.serviceLocationId) {
     return helpers.error('any.custom', {
-      message: 'serviceId must not be provided when location is user'
+      message: 'serviceLocationId must not be provided when location is user'
     })
   }
   return value
@@ -250,6 +250,23 @@ export const getAllProductServicePricesSchema = (req: Request) => {
       .options({ abortEarly: false }),
     input: {
       productId: req.params.productId
+    }
+  }
+}
+
+export const calculateProductPriceSchema = (req: Request) => {
+  return {
+    schema: Joi.object()
+      .keys({
+        productId: uuidSchema.required(),
+        quantity: Joi.number().integer().min(1).required(),
+        userId: uuidSchema.required()
+      })
+      .options({ abortEarly: false }),
+    input: {
+      productId: req.body.productId ?? req.query.productId,
+      quantity: req.body.quantity ?? req.query.quantity,
+      userId: req.body.userId ?? req.query.userId
     }
   }
 }
