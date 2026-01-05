@@ -7,6 +7,7 @@ export enum OrderStatus {
   IN_PRODUCTION = 'IN_PRODUCTION',
   READY = 'READY',
   IN_TRANSIT = 'IN_TRANSIT',
+  FINAL_PAYMENT_PENDING = 'FINAL_PAYMENT_PENDING',
   COMPLETED = 'COMPLETED'
 }
 
@@ -82,6 +83,15 @@ export const ORDER_STATUS_DESCRIPTIONS: Record<
     customerMessage:
       "Your order is on its way! You can expect delivery soon, or it's ready for pickup at your convenience.",
     adminMessage: 'Order is out for delivery or ready for customer pickup.'
+  },
+  [OrderStatus.FINAL_PAYMENT_PENDING]: {
+    title: 'Final Invoice Sent - Awaiting Payment',
+    description:
+      'Your order has been delivered or is ready for pickup. Final invoice has been sent. Please complete the final payment to finalize your order.',
+    customerMessage:
+      'Your order has been delivered or is ready for pickup. The final invoice has been sent. Please complete the final payment to finalize your order.',
+    adminMessage:
+      'Order delivered or ready for pickup. Final invoice sent to customer. Awaiting final payment.'
   },
   [OrderStatus.COMPLETED]: {
     title: 'Order Completed',

@@ -6,11 +6,13 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  OneToMany,
   Index
 } from 'typeorm'
 import { Order } from './ordersModel'
 import { ServiceModel } from '../service/serviceModel'
 import { ServiceLocationModel } from '../service_location/serviceLocationModel'
+import { OrderServiceProduct } from './orderServiceProductModel'
 import { decimalTransformer } from '../../services/utils'
 
 @Entity('order_service')
@@ -53,6 +55,12 @@ export class OrderService {
   })
   @JoinColumn({ name: 'service_location_id' })
   serviceLocation?: ServiceLocationModel | null
+
+  @OneToMany(
+    () => OrderServiceProduct,
+    (orderServiceProduct) => orderServiceProduct.orderService
+  )
+  products?: OrderServiceProduct[]
 
   @CreateDateColumn({
     type: 'timestamp',

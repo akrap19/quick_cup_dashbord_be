@@ -10,17 +10,29 @@ const orderProductSchema = Joi.object({
   price: Joi.number().precision(4).positive().required()
 })
 
+const orderServiceProductSchema = Joi.object({
+  productId: uuidSchema.required(),
+  quantity: Joi.number().integer().min(0).required()
+})
+
 const orderServiceSchema = Joi.object({
   serviceId: uuidSchema.required(),
   quantity: Joi.number().integer().min(1).required(),
   price: Joi.number().precision(4).positive().required(),
-  serviceLocationId: uuidSchema.allow(null).optional()
+  serviceLocationId: uuidSchema.allow(null).optional(),
+  quantityByProduct: Joi.array().items(orderServiceProductSchema).optional()
+})
+
+const orderAdditionalCostProductSchema = Joi.object({
+  productId: uuidSchema.required(),
+  quantity: Joi.number().integer().min(0).required()
 })
 
 const orderAdditionalCostSchema = Joi.object({
   additionalCostId: uuidSchema.required(),
   price: Joi.number().precision(4).positive().required(),
-  quantity: Joi.number().integer().min(1).allow(null).optional()
+  quantity: Joi.number().integer().min(1).allow(null).optional(),
+  quantityByProduct: Joi.array().items(orderAdditionalCostProductSchema).optional()
 })
 
 const baseOrderBody = {

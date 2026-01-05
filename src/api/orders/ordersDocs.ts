@@ -57,7 +57,7 @@ const paths = {
       responses: {
         '200': {
           description:
-            'Successfully retrieved order. The response includes serviceLocation information for each service, showing which service location (if any) the service is allocated to.',
+            'Successfully retrieved order. The response includes serviceLocation information for each service, showing which service location (if any) the service is allocated to. Each service also includes quantityByProduct array showing the breakdown of product quantities within the service.',
           content: {
             'application/json': {
               schema: {
@@ -171,9 +171,20 @@ const definitions = {
       services: [
         {
           serviceId: 'uuid-here',
-          quantity: 1,
+          quantity: 1000,
           price: 15.0,
-          serviceLocationId: 'uuid-here' // Optional: allocate service to a specific service location
+          serviceLocationId: 'uuid-here', // Optional: allocate service to a specific service location
+          quantityByProduct: [
+            // Optional: breakdown of product quantities within this service
+            {
+              productId: '49fde29b-5273-42fd-9475-a199d9bbf013',
+              quantity: 700
+            },
+            {
+              productId: '3ebb80fe-fe2a-43f1-82a0-7d6ae2cf06f6',
+              quantity: 300
+            }
+          ]
         }
       ],
       additionalCosts: [
@@ -181,11 +192,12 @@ const definitions = {
           additionalCostId: 'uuid-here',
           price: 10.5,
           quantity: 2
+          // Note: quantityByProduct is NOT available in POST, only quantity is needed initially
         }
       ]
     },
     description:
-      'Order number is automatically generated in format: qc-ddmmyy0000001. Each service in the services array can optionally include a serviceLocationId to allocate the service to a specific service location.'
+      'Order number is automatically generated in format: qc-ddmmyy0000001. Each service in the services array can optionally include a serviceLocationId to allocate the service to a specific service location, and quantityByProduct array to specify how many of each product are included in the service. Note: quantityByProduct for additionalCosts is NOT available in POST - only quantity is needed initially. Use PUT to add quantityByProduct breakdown for additional costs with methodOfPayment = "after".'
   },
   update_order_body: {
     example: {
@@ -205,28 +217,51 @@ const definitions = {
       services: [
         {
           serviceId: 'uuid-here',
-          quantity: 1,
+          quantity: 1000,
           price: 15.0,
-          serviceLocationId: 'uuid-here' // Optional: allocate service to a specific service location
+          serviceLocationId: 'uuid-here', // Optional: allocate service to a specific service location
+          quantityByProduct: [
+            // Optional: breakdown of product quantities within this service
+            {
+              productId: '49fde29b-5273-42fd-9475-a199d9bbf013',
+              quantity: 700
+            },
+            {
+              productId: '3ebb80fe-fe2a-43f1-82a0-7d6ae2cf06f6',
+              quantity: 300
+            }
+          ]
         }
       ],
       additionalCosts: [
         {
           additionalCostId: 'uuid-here',
           price: 15.75,
-          quantity: 1
+          quantity: 1,
+          quantityByProduct: [
+            // Optional: breakdown of product quantities within this additional cost
+            // Only used when additionalCost.methodOfPayment is 'after'
+            {
+              productId: '49fde29b-5273-42fd-9475-a199d9bbf013',
+              quantity: 500
+            },
+            {
+              productId: '3ebb80fe-fe2a-43f1-82a0-7d6ae2cf06f6',
+              quantity: 500
+            }
+          ]
         }
       ]
     },
     description:
-      'Each service in the services array can optionally include a serviceLocationId to allocate the service to a specific service location.'
+      'Each service in the services array can optionally include a serviceLocationId to allocate the service to a specific service location, and quantityByProduct array to specify how many of each product are included in the service. For additionalCosts, quantityByProduct is optional and only used when the additionalCost.methodOfPayment is "after" - it allows you to specify a breakdown of product quantities within the additional cost.'
   },
   update_order_status_body: {
     example: {
       status: 'ACCEPTED'
     },
     description:
-      'Valid status values: PENDING, ACCEPTED, DECLINED, PAYMENT_PENDING, PAYMENT_RECEIVED, IN_PRODUCTION, READY, IN_TRANSIT, COMPLETED. The response will include statusInfo with title, description, customerMessage, and adminMessage.'
+      'Valid status values: PENDING, ACCEPTED, DECLINED, PAYMENT_PENDING, PAYMENT_RECEIVED, IN_PRODUCTION, READY, IN_TRANSIT, FINAL_PAYMENT_PENDING, COMPLETED. The response will include statusInfo with title, description, customerMessage, and adminMessage.'
   },
   list_orders_response: {
     example: {
@@ -284,9 +319,19 @@ const definitions = {
                 id: '88069d61-3f62-4f3f-b8c4-10f3f26b4e51',
                 orderId: '83d0de32-41a0-4474-b93b-78c8e96e31a6',
                 serviceId: '99069d61-3f62-4f3f-b8c4-10f3f26b4e51',
-                quantity: 1,
+                quantity: 1000,
                 price: 15.0,
                 serviceLocationId: 'aa069d61-3f62-4f3f-b8c4-10f3f26b4e51',
+                quantityByProduct: [
+                  {
+                    productId: '49fde29b-5273-42fd-9475-a199d9bbf013',
+                    quantity: 700
+                  },
+                  {
+                    productId: '3ebb80fe-fe2a-43f1-82a0-7d6ae2cf06f6',
+                    quantity: 300
+                  }
+                ],
                 createdAt: '2024-01-01T10:00:00.000Z',
                 updatedAt: '2024-01-01T10:00:00.000Z',
                 serviceLocation: {
@@ -303,12 +348,24 @@ const definitions = {
                 additionalCostId: 'cc069d61-3f62-4f3f-b8c4-10f3f26b4e51',
                 price: 10.5,
                 quantity: 2,
+                quantityByProduct: [
+                  // Only present when additionalCost.methodOfPayment is 'after'
+                  {
+                    productId: '49fde29b-5273-42fd-9475-a199d9bbf013',
+                    quantity: 500
+                  },
+                  {
+                    productId: '3ebb80fe-fe2a-43f1-82a0-7d6ae2cf06f6',
+                    quantity: 500
+                  }
+                ],
                 createdAt: '2024-01-01T10:00:00.000Z',
                 updatedAt: '2024-01-01T10:00:00.000Z',
                 additionalCost: {
                   id: 'cc069d61-3f62-4f3f-b8c4-10f3f26b4e51',
                   name: 'Delivery Fee',
-                  billingType: 'by_piece'
+                  billingType: 'by_piece',
+                  methodOfPayment: 'after'
                 }
               }
             ]
@@ -393,9 +450,19 @@ const definitions = {
             id: '88069d61-3f62-4f3f-b8c4-10f3f26b4e51',
             orderId: '83d0de32-41a0-4474-b93b-78c8e96e31a6',
             serviceId: '99069d61-3f62-4f3f-b8c4-10f3f26b4e51',
-            quantity: 1,
+            quantity: 1000,
             price: 15.0,
             serviceLocationId: 'aa069d61-3f62-4f3f-b8c4-10f3f26b4e51',
+            quantityByProduct: [
+              {
+                productId: '49fde29b-5273-42fd-9475-a199d9bbf013',
+                quantity: 700
+              },
+              {
+                productId: '3ebb80fe-fe2a-43f1-82a0-7d6ae2cf06f6',
+                quantity: 300
+              }
+            ],
             createdAt: '2024-01-01T10:00:00.000Z',
             updatedAt: '2024-01-01T10:00:00.000Z',
             service: {
@@ -417,12 +484,24 @@ const definitions = {
             additionalCostId: 'cc069d61-3f62-4f3f-b8c4-10f3f26b4e51',
             price: 10.5,
             quantity: 2,
+            quantityByProduct: [
+              // Only present when additionalCost.methodOfPayment is 'after'
+              {
+                productId: '49fde29b-5273-42fd-9475-a199d9bbf013',
+                quantity: 500
+              },
+              {
+                productId: '3ebb80fe-fe2a-43f1-82a0-7d6ae2cf06f6',
+                quantity: 500
+              }
+            ],
             createdAt: '2024-01-01T10:00:00.000Z',
             updatedAt: '2024-01-01T10:00:00.000Z',
             additionalCost: {
               id: 'cc069d61-3f62-4f3f-b8c4-10f3f26b4e51',
               name: 'Delivery Fee',
-              billingType: 'by_piece'
+              billingType: 'by_piece',
+              methodOfPayment: 'after'
             }
           }
         ]

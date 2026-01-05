@@ -6,10 +6,12 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  OneToMany,
   Index
 } from 'typeorm'
 import { Order } from './ordersModel'
 import { AdditionalCost } from '../additional_costs/additionalCostModel'
+import { OrderAdditionalCostProduct } from './orderAdditionalCostProductModel'
 import { decimalTransformer } from '../../services/utils'
 
 @Entity('order_additional_cost')
@@ -42,6 +44,12 @@ export class OrderAdditionalCost {
 
   @Column({ type: 'int', nullable: true })
   quantity?: number | null
+
+  @OneToMany(
+    () => OrderAdditionalCostProduct,
+    (orderAdditionalCostProduct) => orderAdditionalCostProduct.orderAdditionalCost
+  )
+  products?: OrderAdditionalCostProduct[]
 
   @CreateDateColumn({
     name: 'created_at',

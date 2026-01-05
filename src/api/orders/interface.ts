@@ -8,17 +8,29 @@ export interface IOrderProductInput {
   price: number
 }
 
+export interface IOrderServiceProductInput {
+  productId: string
+  quantity: number
+}
+
 export interface IOrderServiceInput {
   serviceId: string
   quantity: number
   price: number
   serviceLocationId?: string | null
+  quantityByProduct?: IOrderServiceProductInput[]
+}
+
+export interface IOrderAdditionalCostProductInput {
+  productId: string
+  quantity: number
 }
 
 export interface IOrderAdditionalCostInput {
   additionalCostId: string
   price: number
   quantity?: number | null
+  quantityByProduct?: IOrderAdditionalCostProductInput[]
 }
 
 export interface ICreateOrder extends IServiceMethod {

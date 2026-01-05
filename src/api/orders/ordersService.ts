@@ -21,9 +21,11 @@ import {
 import { Order } from './ordersModel'
 import { OrderProduct } from './orderProductModel'
 import { OrderService } from './orderServiceModel'
+import { OrderServiceProduct } from './orderServiceProductModel'
 import { OrderAdditionalCost } from './orderAdditionalCostModel'
+import { OrderAdditionalCostProduct } from './orderAdditionalCostProductModel'
 import { AdditionalCost } from '../additional_costs/additionalCostModel'
-import { BillingType } from '../additional_costs/interface'
+import { BillingType, MethodOfPayment } from '../additional_costs/interface'
 import { OrderStatus, getStatusDescription } from './orderStatus'
 
 type ListOrdersResponse = Awaited<AsyncResponse<IOrdersPagination>>
@@ -35,7 +37,9 @@ export class OrdersService implements IOrderService {
   private readonly orderRepository: Repository<Order>
   private readonly orderProductRepository: Repository<OrderProduct>
   private readonly orderServiceRepository: Repository<OrderService>
+  private readonly orderServiceProductRepository: Repository<OrderServiceProduct>
   private readonly orderAdditionalCostRepository: Repository<OrderAdditionalCost>
+  private readonly orderAdditionalCostProductRepository: Repository<OrderAdditionalCostProduct>
 
   constructor() {
     this.orderRepository = AppDataSource.manager.getRepository(Order)
@@ -43,8 +47,12 @@ export class OrdersService implements IOrderService {
       AppDataSource.manager.getRepository(OrderProduct)
     this.orderServiceRepository =
       AppDataSource.manager.getRepository(OrderService)
+    this.orderServiceProductRepository =
+      AppDataSource.manager.getRepository(OrderServiceProduct)
     this.orderAdditionalCostRepository =
       AppDataSource.manager.getRepository(OrderAdditionalCost)
+    this.orderAdditionalCostProductRepository =
+      AppDataSource.manager.getRepository(OrderAdditionalCostProduct)
   }
 
   private async generateOrderNumber(
@@ -106,15 +114,61 @@ export class OrdersService implements IOrderService {
         .leftJoinAndSelect('order.products', 'products')
         .leftJoinAndSelect('order.services', 'services')
         .leftJoinAndSelect('services.serviceLocation', 'serviceLocation')
+        .leftJoinAndSelect('services.products', 'serviceProducts')
+        .leftJoinAndSelect('serviceProducts.product', 'serviceProduct')
         .leftJoinAndSelect('order.additionalCosts', 'additionalCosts')
         .leftJoinAndSelect('additionalCosts.additionalCost', 'additionalCost')
+        .leftJoinAndSelect('additionalCosts.products', 'additionalCostProducts')
+        .leftJoinAndSelect(
+          'additionalCostProducts.product',
+          'additionalCostProduct'
+        )
         .orderBy('order.placedAt', 'DESC')
         .skip(offset)
         .take(currentLimit)
         .getManyAndCount()
 
-      // Enrich orders with status descriptions
+      // Enrich orders with status descriptions and transform services
       const enrichedOrders = orders.map((order) => {
+        // Transform services to include quantityByProduct
+        if (order.services && order.services.length > 0) {
+          order.services = order.services.map((service: any) => {
+            const quantityByProduct =
+              service.products && service.products.length > 0
+                ? service.products.map((sp: any) => ({
+                    productId: sp.productId,
+                    quantity: sp.quantity
+                  }))
+                : []
+            return {
+              ...service,
+              quantityByProduct
+            }
+          })
+        }
+
+        // Transform additional costs to include quantityByProduct (only for methodOfPayment = 'after')
+        if (order.additionalCosts && order.additionalCosts.length > 0) {
+          order.additionalCosts = order.additionalCosts.map(
+            (additionalCost: any) => {
+              const quantityByProduct =
+                additionalCost.additionalCost?.methodOfPayment ===
+                  MethodOfPayment.AFTER &&
+                additionalCost.products &&
+                additionalCost.products.length > 0
+                  ? additionalCost.products.map((acp: any) => ({
+                      productId: acp.productId,
+                      quantity: acp.quantity
+                    }))
+                  : []
+              return {
+                ...additionalCost,
+                quantityByProduct
+              }
+            }
+          )
+        }
+
         const statusDesc = getStatusDescription(order.status)
         return {
           ...order,
@@ -175,8 +229,15 @@ export class OrdersService implements IOrderService {
         .leftJoinAndSelect('order.services', 'services')
         .leftJoinAndSelect('services.service', 'service')
         .leftJoinAndSelect('services.serviceLocation', 'serviceLocation')
+        .leftJoinAndSelect('services.products', 'serviceProducts')
+        .leftJoinAndSelect('serviceProducts.product', 'serviceProduct')
         .leftJoinAndSelect('order.additionalCosts', 'additionalCosts')
         .leftJoinAndSelect('additionalCosts.additionalCost', 'additionalCost')
+        .leftJoinAndSelect('additionalCosts.products', 'additionalCostProducts')
+        .leftJoinAndSelect(
+          'additionalCostProducts.product',
+          'additionalCostProduct'
+        )
         .where('order.id = :orderId', { orderId })
 
       if (customerId) {
@@ -210,6 +271,45 @@ export class OrdersService implements IOrderService {
               ;(orderProduct.product as any).images = images
             }
           })
+        )
+      }
+
+      // Transform services to include quantityByProduct
+      if (order.services && order.services.length > 0) {
+        order.services = order.services.map((service: any) => {
+          const quantityByProduct =
+            service.products && service.products.length > 0
+              ? service.products.map((sp: any) => ({
+                  productId: sp.productId,
+                  quantity: sp.quantity
+                }))
+              : []
+          return {
+            ...service,
+            quantityByProduct
+          }
+        })
+      }
+
+      // Transform additional costs to include quantityByProduct (only for methodOfPayment = 'after')
+      if (order.additionalCosts && order.additionalCosts.length > 0) {
+        order.additionalCosts = order.additionalCosts.map(
+          (additionalCost: any) => {
+            const quantityByProduct =
+              additionalCost.additionalCost?.methodOfPayment ===
+                MethodOfPayment.AFTER &&
+              additionalCost.products &&
+              additionalCost.products.length > 0
+                ? additionalCost.products.map((acp: any) => ({
+                    productId: acp.productId,
+                    quantity: acp.quantity
+                  }))
+                : []
+            return {
+              ...additionalCost,
+              quantityByProduct
+            }
+          }
         )
       }
 
@@ -312,7 +412,36 @@ export class OrdersService implements IOrderService {
             serviceLocationId: service.serviceLocationId ?? null
           })
         )
-        await orderServiceRepository.save(orderServices)
+        const savedOrderServices = await orderServiceRepository.save(
+          orderServices
+        )
+
+        // Create order service products (quantityByProduct)
+        if (savedOrderServices.length > 0) {
+          const orderServiceProductsData: any[] = []
+          savedOrderServices.forEach((savedOrderService, index) => {
+            const service = services[index]
+            if (
+              service.quantityByProduct &&
+              service.quantityByProduct.length > 0
+            ) {
+              service.quantityByProduct.forEach((product) => {
+                orderServiceProductsData.push(
+                  manager.getRepository(OrderServiceProduct).create({
+                    orderServiceId: savedOrderService.id,
+                    productId: product.productId,
+                    quantity: product.quantity
+                  })
+                )
+              })
+            }
+          })
+          if (orderServiceProductsData.length > 0) {
+            await manager
+              .getRepository(OrderServiceProduct)
+              .save(orderServiceProductsData)
+          }
+        }
       }
 
       // Create order additional costs
@@ -369,6 +498,15 @@ export class OrdersService implements IOrderService {
         .leftJoinAndSelect('order.services', 'services')
         .leftJoinAndSelect('services.service', 'service')
         .leftJoinAndSelect('services.serviceLocation', 'serviceLocation')
+        .leftJoinAndSelect('services.products', 'serviceProducts')
+        .leftJoinAndSelect('serviceProducts.product', 'serviceProduct')
+        .leftJoinAndSelect('order.additionalCosts', 'additionalCosts')
+        .leftJoinAndSelect('additionalCosts.additionalCost', 'additionalCost')
+        .leftJoinAndSelect('additionalCosts.products', 'additionalCostProducts')
+        .leftJoinAndSelect(
+          'additionalCostProducts.product',
+          'additionalCostProduct'
+        )
         .where('order.id = :orderId', { orderId: savedOrder.id })
         .getOne()
 
@@ -403,6 +541,28 @@ export class OrdersService implements IOrderService {
               ;(orderProduct.product as any).images = images
             }
           })
+        )
+      }
+
+      // Transform services to include quantityByProduct
+      if (
+        orderWithRelations.services &&
+        orderWithRelations.services.length > 0
+      ) {
+        orderWithRelations.services = orderWithRelations.services.map(
+          (service: any) => {
+            const quantityByProduct =
+              service.products && service.products.length > 0
+                ? service.products.map((sp: any) => ({
+                    productId: sp.productId,
+                    quantity: sp.quantity
+                  }))
+                : []
+            return {
+              ...service,
+              quantityByProduct
+            }
+          }
         )
       }
 
@@ -542,6 +702,25 @@ export class OrdersService implements IOrderService {
 
       // Update services if provided
       if (typeof services !== 'undefined') {
+        // Delete existing service products first (due to foreign key constraint)
+        const existingOrderServices = await orderServiceRepository.find({
+          where: { orderId }
+        })
+        if (existingOrderServices.length > 0) {
+          const existingOrderServiceIds = existingOrderServices.map(
+            (os) => os.id
+          )
+          const orderServiceProductRepo =
+            manager.getRepository(OrderServiceProduct)
+          await orderServiceProductRepo
+            .createQueryBuilder()
+            .delete()
+            .where('orderServiceId IN (:...ids)', {
+              ids: existingOrderServiceIds
+            })
+            .execute()
+        }
+
         // Delete existing services
         await orderServiceRepository.delete({ orderId })
 
@@ -556,12 +735,61 @@ export class OrdersService implements IOrderService {
               serviceLocationId: service.serviceLocationId ?? null
             })
           )
-          await orderServiceRepository.save(orderServices)
+          const savedOrderServices = await orderServiceRepository.save(
+            orderServices
+          )
+
+          // Create order service products (quantityByProduct)
+          if (savedOrderServices.length > 0) {
+            const orderServiceProductsData: any[] = []
+            savedOrderServices.forEach((savedOrderService, index) => {
+              const service = services[index]
+              if (
+                service.quantityByProduct &&
+                service.quantityByProduct.length > 0
+              ) {
+                service.quantityByProduct.forEach((product) => {
+                  orderServiceProductsData.push(
+                    manager.getRepository(OrderServiceProduct).create({
+                      orderServiceId: savedOrderService.id,
+                      productId: product.productId,
+                      quantity: product.quantity
+                    })
+                  )
+                })
+              }
+            })
+            if (orderServiceProductsData.length > 0) {
+              await manager
+                .getRepository(OrderServiceProduct)
+                .save(orderServiceProductsData)
+            }
+          }
         }
       }
 
       // Update additional costs if provided
       if (typeof additionalCosts !== 'undefined') {
+        // Delete existing additional cost products first (due to foreign key constraint)
+        const existingOrderAdditionalCosts =
+          await orderAdditionalCostRepository.find({
+            where: { orderId }
+          })
+        if (existingOrderAdditionalCosts.length > 0) {
+          const existingOrderAdditionalCostIds =
+            existingOrderAdditionalCosts.map((oac) => oac.id)
+          const orderAdditionalCostProductRepo = manager.getRepository(
+            OrderAdditionalCostProduct
+          )
+          await orderAdditionalCostProductRepo
+            .createQueryBuilder()
+            .delete()
+            .where('orderAdditionalCostId IN (:...ids)', {
+              ids: existingOrderAdditionalCostIds
+            })
+            .execute()
+        }
+
         // Delete existing additional costs
         await orderAdditionalCostRepository.delete({ orderId })
 
@@ -603,7 +831,46 @@ export class OrdersService implements IOrderService {
               })
             })
           )
-          await orderAdditionalCostRepository.save(orderAdditionalCostsData)
+          const savedOrderAdditionalCosts =
+            await orderAdditionalCostRepository.save(orderAdditionalCostsData)
+
+          // Create order additional cost products (quantityByProduct) - only for methodOfPayment = 'after'
+          if (savedOrderAdditionalCosts.length > 0) {
+            const orderAdditionalCostProductsData: any[] = []
+            for (let i = 0; i < savedOrderAdditionalCosts.length; i++) {
+              const savedOrderAdditionalCost = savedOrderAdditionalCosts[i]
+              const additionalCost = additionalCosts[i]
+
+              // Fetch the additional cost entity to check methodOfPayment
+              const additionalCostEntity =
+                await additionalCostRepository.findOne({
+                  where: { id: additionalCost.additionalCostId }
+                })
+
+              // Only save quantityByProduct if methodOfPayment is 'after'
+              if (
+                additionalCostEntity?.methodOfPayment ===
+                  MethodOfPayment.AFTER &&
+                additionalCost.quantityByProduct &&
+                additionalCost.quantityByProduct.length > 0
+              ) {
+                additionalCost.quantityByProduct.forEach((product) => {
+                  orderAdditionalCostProductsData.push(
+                    manager.getRepository(OrderAdditionalCostProduct).create({
+                      orderAdditionalCostId: savedOrderAdditionalCost.id,
+                      productId: product.productId,
+                      quantity: product.quantity
+                    })
+                  )
+                })
+              }
+            }
+            if (orderAdditionalCostProductsData.length > 0) {
+              await manager
+                .getRepository(OrderAdditionalCostProduct)
+                .save(orderAdditionalCostProductsData)
+            }
+          }
         }
       }
 
