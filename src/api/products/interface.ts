@@ -151,6 +151,28 @@ export interface ICalculatedProductPrice {
   priceSource: 'client' | 'product'
 }
 
+export interface IBulkUpdateProductStates extends IServiceMethod {
+  updates: Array<{
+    productId: string
+    productStates: Array<{
+      status: string
+      location: string
+      quantity: number
+      serviceLocationId?: string | null
+      userId?: string | null
+    }>
+  }>
+}
+
+export interface IBulkUpdateProductStatesResult {
+  updatedProducts: Array<{
+    productId: string
+    success: boolean
+    product?: Product
+    error?: string
+  }>
+}
+
 export interface IProductService {
   listProducts(params: IListProducts): AsyncResponse<IProductsPagination>
   getProductById(params: IGetProductById): AsyncResponse<Product>
@@ -166,4 +188,7 @@ export interface IProductService {
   calculateProductPrice(
     params: ICalculateProductPrice
   ): AsyncResponse<ICalculatedProductPrice>
+  bulkUpdateProductStates(
+    params: IBulkUpdateProductStates
+  ): AsyncResponse<IBulkUpdateProductStatesResult>
 }

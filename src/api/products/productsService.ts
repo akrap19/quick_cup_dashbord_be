@@ -7,6 +7,8 @@ import { logger } from '../../logger'
 import { getResponseMessage } from '../../services/utils'
 import {
   AcquisitionType,
+  IBulkUpdateProductStates,
+  IBulkUpdateProductStatesResult,
   IAllProductPrices,
   ICalculateProductPrice,
   ICalculatedProductPrice,
@@ -1758,6 +1760,227 @@ export class ProductsService implements IProductService {
           unitPrice: price,
           totalPrice,
           priceSource
+        },
+        code
+      }
+    } catch (err: any) {
+      code = ResponseCode.SERVER_ERROR
+      logger.error({
+        code,
+        message: getResponseMessage(code),
+        stack: err.stack
+      })
+      return { code }
+    }
+  }
+
+  bulkUpdateProductStates = async ({
+    updates,
+    queryRunner
+  }: IBulkUpdateProductStates): AsyncResponse<IBulkUpdateProductStatesResult> => {
+    let code: ResponseCode = ResponseCode.OK
+
+    try {
+      const manager = queryRunner ? queryRunner.manager : AppDataSource.manager
+      const productStateRepository = manager.getRepository(ProductState)
+      const serviceLocationRepository =
+        manager.getRepository(ServiceLocationModel)
+      const userRepository = manager.getRepository(User)
+      const productRepository = manager.getRepository(Product)
+
+      const results: IBulkUpdateProductStatesResult['updatedProducts'] = []
+
+      // Process each product update
+      for (const update of updates) {
+        const { productId, productStates } = update
+        let hasError = false
+        let errorMessage = ''
+
+        try {
+          // Verify product exists and is not deleted
+          const product = await productRepository.findOne({
+            where: { id: productId, status: ProductStatus.ACTIVE }
+          })
+
+          if (!product) {
+            results.push({
+              productId,
+              success: false,
+              error: 'Product not found or deleted'
+            })
+            continue
+          }
+
+          // Validate all product states before making any changes
+          if (productStates && productStates.length > 0) {
+            for (const state of productStates) {
+              // Validate location-specific fields
+              if (
+                state.location === ProductStateLocation.SERVICE &&
+                !state.serviceLocationId
+              ) {
+                hasError = true
+                errorMessage =
+                  'serviceLocationId is required when location is service'
+                break
+              }
+              if (
+                state.location === ProductStateLocation.USER &&
+                !state.userId
+              ) {
+                hasError = true
+                errorMessage = 'userId is required when location is user'
+                break
+              }
+              if (
+                state.location === ProductStateLocation.SERVICE &&
+                state.userId
+              ) {
+                hasError = true
+                errorMessage =
+                  'userId must not be provided when location is service'
+                break
+              }
+              if (
+                state.location === ProductStateLocation.USER &&
+                state.serviceLocationId
+              ) {
+                hasError = true
+                errorMessage =
+                  'serviceLocationId must not be provided when location is user'
+                break
+              }
+
+              // Validate that referenced entities exist
+              if (
+                state.location === ProductStateLocation.SERVICE &&
+                state.serviceLocationId
+              ) {
+                const serviceLocation = await serviceLocationRepository.findOne(
+                  {
+                    where: { id: state.serviceLocationId }
+                  }
+                )
+                if (!serviceLocation) {
+                  hasError = true
+                  errorMessage = 'Service location not found'
+                  break
+                }
+              }
+
+              if (
+                state.location === ProductStateLocation.USER &&
+                state.userId
+              ) {
+                const user = await userRepository.findOne({
+                  where: { id: state.userId }
+                })
+                if (!user) {
+                  hasError = true
+                  errorMessage = 'User not found'
+                  break
+                }
+              }
+            }
+          }
+
+          if (hasError) {
+            results.push({
+              productId,
+              success: false,
+              error: errorMessage
+            })
+            continue
+          }
+
+          // Delete all existing product states for this product
+          await productStateRepository.delete({ productId })
+
+          // Create new product states if provided
+          if (productStates && productStates.length > 0) {
+            const productStateRecords = productStates.map((state) =>
+              productStateRepository.create({
+                status: state.status as ProductStateStatus,
+                location: state.location as ProductStateLocation,
+                quantity: state.quantity,
+                productId,
+                serviceLocationId:
+                  state.location === ProductStateLocation.SERVICE
+                    ? state.serviceLocationId
+                    : null,
+                userId:
+                  state.location === ProductStateLocation.USER
+                    ? state.userId
+                    : null
+              })
+            )
+
+            try {
+              await productStateRepository.save(productStateRecords)
+            } catch (saveErr: any) {
+              logger.error({
+                code: ResponseCode.SERVER_ERROR,
+                message: 'Failed to save product states',
+                stack: saveErr.stack,
+                productId
+              })
+              results.push({
+                productId,
+                success: false,
+                error: 'Failed to save product states'
+              })
+              continue
+            }
+          }
+
+          // Reload product with updated states
+          const productResponse = await this.getProductById({
+            productId,
+            queryRunner
+          })
+
+          if (!('product' in productResponse) || !productResponse.product) {
+            results.push({
+              productId,
+              success: false,
+              error: 'Failed to retrieve updated product'
+            })
+            continue
+          }
+
+          // Type guard to ensure product is actually a Product, not ResponseCode
+          const updatedProduct = productResponse.product
+          if (typeof updatedProduct === 'object' && 'id' in updatedProduct) {
+            results.push({
+              productId,
+              success: true,
+              product: updatedProduct as Product
+            })
+          } else {
+            results.push({
+              productId,
+              success: false,
+              error: 'Failed to retrieve updated product'
+            })
+          }
+        } catch (err: any) {
+          logger.error({
+            code: ResponseCode.SERVER_ERROR,
+            message: 'Error updating product states',
+            stack: err.stack,
+            productId
+          })
+          results.push({
+            productId,
+            success: false,
+            error: err.message || 'Unknown error'
+          })
+        }
+      }
+
+      return {
+        data: {
+          updatedProducts: results
         },
         code
       }

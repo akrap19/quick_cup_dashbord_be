@@ -198,4 +198,24 @@ export class ProductsController {
 
     return next({ data, code })
   }
+
+  bulkUpdateProductStates = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const input = res.locals.input ?? {}
+    const { updates } = input
+
+    const { data, code } =
+      await this.productsService.bulkUpdateProductStates({
+        updates
+      })
+
+    if (!data) {
+      return next({ code })
+    }
+
+    return next({ data, code })
+  }
 }

@@ -35,20 +35,21 @@ const productStateSchema = Joi.object({
     .valid(ProductStateLocation.SERVICE, ProductStateLocation.USER)
     .required(),
   quantity: Joi.number().integer().min(0).required(),
-  serviceLocationId: uuidSchema
-    .when('location', {
-      is: ProductStateLocation.SERVICE,
-      then: Joi.required(),
-      otherwise: Joi.allow(null).optional()
-    }),
-  userId: uuidSchema
-    .when('location', {
-      is: ProductStateLocation.USER,
-      then: Joi.required(),
-      otherwise: Joi.allow(null).optional()
-    })
+  serviceLocationId: uuidSchema.when('location', {
+    is: ProductStateLocation.SERVICE,
+    then: Joi.required(),
+    otherwise: Joi.allow(null).optional()
+  }),
+  userId: uuidSchema.when('location', {
+    is: ProductStateLocation.USER,
+    then: Joi.required(),
+    otherwise: Joi.allow(null).optional()
+  })
 }).custom((value, helpers) => {
-  if (value.location === ProductStateLocation.SERVICE && !value.serviceLocationId) {
+  if (
+    value.location === ProductStateLocation.SERVICE &&
+    !value.serviceLocationId
+  ) {
     return helpers.error('any.custom', {
       message: 'serviceLocationId is required when location is service'
     })
@@ -267,6 +268,27 @@ export const calculateProductPriceSchema = (req: Request) => {
       productId: req.body.productId ?? req.query.productId,
       quantity: req.body.quantity ?? req.query.quantity,
       userId: req.body.userId ?? req.query.userId
+    }
+  }
+}
+
+export const bulkUpdateProductStatesSchema = (req: Request) => {
+  return {
+    schema: Joi.object()
+      .keys({
+        updates: Joi.array()
+          .items(
+            Joi.object({
+              productId: uuidSchema.required(),
+              productStates: Joi.array().items(productStateSchema).required()
+            })
+          )
+          .min(1)
+          .required()
+      })
+      .options({ abortEarly: false }),
+    input: {
+      updates: Array.isArray(req.body.updates) ? req.body.updates : undefined
     }
   }
 }

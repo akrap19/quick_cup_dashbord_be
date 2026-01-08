@@ -6,6 +6,7 @@ import { validate } from '../../middleware/validation'
 import { RoleType } from '../role/interface'
 import { ProductsController } from './productsController'
 import {
+  bulkUpdateProductStatesSchema,
   calculateProductPriceSchema,
   createProductSchema,
   getAllProductPricesSchema,
@@ -19,6 +20,7 @@ const productsController = container.resolve(ProductsController)
 export const productsRouter = express.Router()
 
 const adminRoles = [RoleType.MASTER_ADMIN, RoleType.ADMIN]
+const serviceRoles = [RoleType.SERVICE]
 
 productsRouter.get(
   '/',
@@ -82,4 +84,12 @@ productsRouter.post(
   requireRole(adminRoles),
   validate(calculateProductPriceSchema),
   productsController.calculateProductPrice
+)
+
+productsRouter.post(
+  '/bulk-update-product-states',
+  requireToken,
+  requireRole(serviceRoles),
+  validate(bulkUpdateProductStatesSchema),
+  productsController.bulkUpdateProductStates
 )

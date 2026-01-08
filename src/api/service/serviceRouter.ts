@@ -39,7 +39,7 @@ serviceRouter.get(
 serviceRouter.get(
   '/service-locations',
   requireToken,
-  requireRole(adminRoles),
+  requireRole([RoleType.MASTER_ADMIN, RoleType.ADMIN, RoleType.SERVICE]),
   validate(getAllServiceLocationsSchema),
   servicesController.getAllServiceLocations
 )

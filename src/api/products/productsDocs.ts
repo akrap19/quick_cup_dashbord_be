@@ -207,6 +207,60 @@ const paths = {
         }
       }
     }
+  },
+  '/products/bulk-update-product-states': {
+    post: {
+      tags: ['Products'],
+      description:
+        'Bulk update product states for multiple products at once. This endpoint is restricted to service users only. For each product, all existing product states are deleted and replaced with the new product states provided. The endpoint validates all product states before making any changes, ensuring data integrity. Returns detailed results for each product update, including success status and any errors encountered.',
+      security: [
+        {
+          bearerAuth: []
+        }
+      ],
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              $ref: '#/definitions/bulk_update_product_states_body'
+            }
+          }
+        }
+      },
+      responses: {
+        '200': {
+          description: 'Bulk update completed. Check individual product results for success/failure status.',
+          content: {
+            'application/json': {
+              schema: {
+                $ref: '#/definitions/bulk_update_product_states_response'
+              }
+            }
+          }
+        },
+        '400': {
+          description: 'Invalid input - validation failed',
+          content: {
+            'application/json': {
+              schema: {
+                $ref: '#/definitions/user_not_found_response'
+              }
+            }
+          }
+        },
+        '403': {
+          description: 'Forbidden - Service user role required',
+          content: {
+            'application/json': {
+              schema: {
+                $ref: '#/definitions/user_not_found_response'
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }
 
@@ -800,6 +854,156 @@ const definitions = {
         unitPrice: 1.3,
         totalPrice: 1040.0,
         priceSource: 'client'
+      },
+      code: 200000,
+      message: 'OK'
+    }
+  },
+  bulk_update_product_states_body: {
+    type: 'object',
+    required: ['updates'],
+    properties: {
+      updates: {
+        type: 'array',
+        minItems: 1,
+        items: {
+          type: 'object',
+          required: ['productId', 'productStates'],
+          properties: {
+            productId: {
+              type: 'string',
+              format: 'uuid',
+              description: 'Product ID to update'
+            },
+            productStates: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['status', 'location', 'quantity'],
+                properties: {
+                  status: {
+                    type: 'string',
+                    enum: [
+                      'available',
+                      'in_use',
+                      'maintenance',
+                      'reserved',
+                      'damaged'
+                    ],
+                    description: 'Status of the product state'
+                  },
+                  location: {
+                    type: 'string',
+                    enum: ['service', 'user'],
+                    description: 'Location type of the product state'
+                  },
+                  quantity: {
+                    type: 'integer',
+                    minimum: 0,
+                    description: 'Quantity of products in this state'
+                  },
+                  serviceLocationId: {
+                    type: 'string',
+                    format: 'uuid',
+                    nullable: true,
+                    description:
+                      'Service Location ID (required when location is "service", must be null when location is "user")'
+                  },
+                  userId: {
+                    type: 'string',
+                    format: 'uuid',
+                    nullable: true,
+                    description:
+                      'User ID (required when location is "user", must be null when location is "service")'
+                  }
+                }
+              },
+              description:
+                'Array of product states for this product. All existing product states will be deleted and replaced with these new states.'
+            }
+          }
+        },
+        description:
+          'Array of product updates. Each update contains a productId and the new productStates array.'
+      }
+    },
+    example: {
+      updates: [
+        {
+          productId: '83d0de32-41a0-4474-b93b-78c8e96e31a6',
+          productStates: [
+            {
+              status: 'available',
+              location: 'service',
+              quantity: 10,
+              serviceLocationId: '123e4567-e89b-12d3-a456-426614174000',
+              userId: null
+            },
+            {
+              status: 'in_use',
+              location: 'user',
+              quantity: 5,
+              serviceLocationId: null,
+              userId: '123e4567-e89b-12d3-a456-426614174001'
+            }
+          ]
+        },
+        {
+          productId: '93d0de32-41a0-4474-b93b-78c8e96e31a7',
+          productStates: [
+            {
+              status: 'maintenance',
+              location: 'service',
+              quantity: 2,
+              serviceLocationId: '123e4567-e89b-12d3-a456-426614174000',
+              userId: null
+            }
+          ]
+        }
+      ]
+    }
+  },
+  bulk_update_product_states_response: {
+    type: 'object',
+    example: {
+      data: {
+        updatedProducts: [
+          {
+            productId: '83d0de32-41a0-4474-b93b-78c8e96e31a6',
+            success: true,
+            product: {
+              id: '83d0de32-41a0-4474-b93b-78c8e96e31a6',
+              name: 'Sample Product',
+              productStates: [
+                {
+                  id: 'state-id-1',
+                  status: 'available',
+                  location: 'service',
+                  quantity: 10,
+                  serviceLocationId: '123e4567-e89b-12d3-a456-426614174000',
+                  userId: null,
+                  createdAt: '2024-01-01T00:00:00.000Z',
+                  updatedAt: '2024-01-01T00:00:00.000Z'
+                },
+                {
+                  id: 'state-id-2',
+                  status: 'in_use',
+                  location: 'user',
+                  quantity: 5,
+                  serviceLocationId: null,
+                  userId: '123e4567-e89b-12d3-a456-426614174001',
+                  createdAt: '2024-01-01T00:00:00.000Z',
+                  updatedAt: '2024-01-01T00:00:00.000Z'
+                }
+              ]
+            }
+          },
+          {
+            productId: '93d0de32-41a0-4474-b93b-78c8e96e31a7',
+            success: false,
+            error: 'Product not found or deleted'
+          }
+        ]
       },
       code: 200000,
       message: 'OK'
