@@ -4,6 +4,7 @@ import { ResponseCode } from '../../interface'
 import { AdditionalCostsService } from './additionalCostService'
 import { MethodOfPayment, BillingType } from './interface'
 import { AcquisitionType } from '../products/interface'
+import { ProductStateStatus } from '../product_state/interface'
 
 @autoInjectable()
 export class AdditionalCostsController {
@@ -19,15 +20,23 @@ export class AdditionalCostsController {
     next: NextFunction
   ) => {
     const input = res.locals.input ?? {}
-    const { page, limit, search, methodOfPayment, billingType, acquisitionType } =
-      input
+    const {
+      page,
+      limit,
+      search,
+      methodOfPayment,
+      billingType,
+      acquisitionType
+    } = input
 
     const pageNumber = typeof page === 'number' ? page : undefined
     const limitNumber = typeof limit === 'number' ? limit : undefined
     const searchTerm = typeof search === 'string' ? search : null
     const methodOfPaymentFilter =
       typeof methodOfPayment === 'string' &&
-      Object.values(MethodOfPayment).includes(methodOfPayment as MethodOfPayment)
+      Object.values(MethodOfPayment).includes(
+        methodOfPayment as MethodOfPayment
+      )
         ? (methodOfPayment as MethodOfPayment)
         : null
     const billingTypeFilter =
@@ -92,18 +101,31 @@ export class AdditionalCostsController {
     next: NextFunction
   ) => {
     const input = res.locals.input ?? {}
-    const { name, methodOfPayment, billingType, acquisitionType, price } = input
+    const {
+      name,
+      methodOfPayment,
+      billingType,
+      acquisitionType,
+      price,
+      calculationStatus
+    } = input
 
     const numericPrice =
-      typeof price === 'number'
-        ? price
-        : price
-        ? Number(price)
-        : undefined
+      typeof price === 'number' ? price : price ? Number(price) : undefined
 
     if (typeof numericPrice !== 'number' || Number.isNaN(numericPrice)) {
       return next({ code: ResponseCode.INVALID_INPUT })
     }
+
+    const calculationStatusFilter =
+      typeof calculationStatus === 'string' &&
+      Object.values(ProductStateStatus).includes(
+        calculationStatus as ProductStateStatus
+      )
+        ? (calculationStatus as ProductStateStatus)
+        : calculationStatus === null
+        ? null
+        : undefined
 
     const { additionalCost, code } =
       await this.additionalCostsService.createAdditionalCost({
@@ -111,7 +133,8 @@ export class AdditionalCostsController {
         methodOfPayment,
         billingType,
         acquisitionType,
-        price: numericPrice
+        price: numericPrice,
+        calculationStatus: calculationStatusFilter
       })
 
     if (!additionalCost) {
@@ -133,7 +156,8 @@ export class AdditionalCostsController {
       methodOfPayment,
       billingType,
       acquisitionType,
-      price
+      price,
+      calculationStatus
     } = input
 
     if (typeof additionalCostId !== 'string') {
@@ -141,11 +165,7 @@ export class AdditionalCostsController {
     }
 
     const numericPrice =
-      typeof price === 'number'
-        ? price
-        : price
-        ? Number(price)
-        : undefined
+      typeof price === 'number' ? price : price ? Number(price) : undefined
 
     if (
       typeof numericPrice !== 'undefined' &&
@@ -154,6 +174,16 @@ export class AdditionalCostsController {
       return next({ code: ResponseCode.INVALID_INPUT })
     }
 
+    const calculationStatusFilter =
+      typeof calculationStatus === 'string' &&
+      Object.values(ProductStateStatus).includes(
+        calculationStatus as ProductStateStatus
+      )
+        ? (calculationStatus as ProductStateStatus)
+        : calculationStatus === null
+        ? null
+        : undefined
+
     const { additionalCost, code } =
       await this.additionalCostsService.updateAdditionalCost({
         additionalCostId,
@@ -161,7 +191,8 @@ export class AdditionalCostsController {
         methodOfPayment,
         billingType,
         acquisitionType,
-        price: numericPrice
+        price: numericPrice,
+        calculationStatus: calculationStatusFilter
       })
 
     if (!additionalCost) {
@@ -186,4 +217,3 @@ export class AdditionalCostsController {
     return next({ code })
   }
 }
-

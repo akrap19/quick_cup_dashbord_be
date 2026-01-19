@@ -161,6 +161,7 @@ const definitions = {
       street: 'Main Street',
       contactPerson: 'John Doe',
       contactPersonContact: 'john@example.com',
+      discount: 10.5,
       products: [
         {
           productId: 'uuid-here',
@@ -207,6 +208,7 @@ const definitions = {
       location: '456 Oak Ave',
       place: 'Uptown',
       street: 'Oak Avenue',
+      discount: 15.0,
       products: [
         {
           productId: 'uuid-here',
@@ -282,6 +284,7 @@ const definitions = {
             street: 'Main Street',
             contactPerson: 'John Doe',
             contactPersonContact: 'john@example.com',
+            discount: 10.5,
             placedAt: '2024-01-01T10:00:00.000Z',
             createdAt: '2024-01-01T10:00:00.000Z',
             updatedAt: '2024-01-01T10:00:00.000Z',
@@ -398,6 +401,7 @@ const definitions = {
         street: 'Main Street',
         contactPerson: 'John Doe',
         contactPersonContact: 'john@example.com',
+        discount: 10.5,
         placedAt: '2024-01-01T10:00:00.000Z',
         createdAt: '2024-01-01T10:00:00.000Z',
         updatedAt: '2024-01-01T10:00:00.000Z',

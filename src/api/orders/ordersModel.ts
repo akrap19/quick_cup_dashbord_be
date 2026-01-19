@@ -71,6 +71,9 @@ export class Order {
   @Column({ type: 'varchar', length: 255, nullable: true })
   contactPersonContact?: string | null
 
+  @Column({ type: 'float', nullable: true })
+  discount?: number | null
+
   @OneToMany(() => OrderProduct, (orderProduct) => orderProduct.order)
   products?: OrderProduct[]
 

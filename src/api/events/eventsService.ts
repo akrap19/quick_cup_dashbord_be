@@ -68,8 +68,36 @@ export class EventsService implements IEventService {
         .take(currentLimit)
         .getManyAndCount()
 
+      // Get unique user IDs from events
+      const userIds = [...new Set(events.map((event) => event.userId))]
+
+      // Fetch users with companyName
+      const userRepo = queryRunner
+        ? queryRunner.manager.getRepository(User)
+        : this.userRepository
+
+      const users =
+        userIds.length > 0
+          ? await userRepo
+              .createQueryBuilder('user')
+              .where('user.id IN (:...userIds)', { userIds })
+              .select(['user.id', 'user.companyName'])
+              .getMany()
+          : []
+
+      // Create a map of userId to companyName
+      const userCompanyMap = new Map(
+        users.map((user) => [user.id, user.companyName ?? null])
+      )
+
+      // Enrich events with company name
+      const enrichedEvents = events.map((event) => ({
+        ...event,
+        companyName: userCompanyMap.get(event.userId) ?? null
+      }))
+
       const response = {
-        events,
+        events: enrichedEvents,
         pagination: {
           count,
           page: currentPage,
@@ -117,13 +145,14 @@ export class EventsService implements IEventService {
         return { code: ResponseCode.NOT_FOUND }
       }
 
-      // Fetch user to get firstName and lastName
+      // Fetch user to get firstName, lastName, and companyName
       const user = await userRepo.findOne({ where: { id: event.userId } })
 
-      // Add userName field
+      // Add userName and companyName fields
       const eventWithUserName = {
         ...event,
-        userName: user ? `${user.firstName} ${user.lastName}`.trim() : null
+        userName: user ? `${user.firstName} ${user.lastName}`.trim() : null,
+        companyName: user?.companyName ?? null
       }
 
       return { event: eventWithUserName, code }

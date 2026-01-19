@@ -146,6 +146,7 @@ export class AdditionalCostsService implements IAdditionalCostService {
     billingType,
     acquisitionType,
     price,
+    calculationStatus,
     queryRunner
   }: ICreateAdditionalCost): AsyncResponse<AdditionalCost> => {
     let code: ResponseCode = ResponseCode.OK
@@ -160,7 +161,8 @@ export class AdditionalCostsService implements IAdditionalCostService {
         methodOfPayment,
         billingType,
         acquisitionType,
-        price
+        price,
+        calculationStatus
       })
 
       const savedAdditionalCost = await repository.save(additionalCost)
@@ -188,6 +190,7 @@ export class AdditionalCostsService implements IAdditionalCostService {
     billingType,
     acquisitionType,
     price,
+    calculationStatus,
     queryRunner
   }: IUpdateAdditionalCost): AsyncResponse<AdditionalCost> => {
     let code: ResponseCode = ResponseCode.OK
@@ -221,6 +224,9 @@ export class AdditionalCostsService implements IAdditionalCostService {
       }
       if (typeof price !== 'undefined') {
         updateData.price = price
+      }
+      if (typeof calculationStatus !== 'undefined') {
+        updateData.calculationStatus = calculationStatus
       }
 
       if (Object.keys(updateData).length > 0) {

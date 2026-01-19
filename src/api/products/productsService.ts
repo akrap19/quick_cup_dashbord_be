@@ -379,6 +379,8 @@ export class ProductsService implements IProductService {
 
   getProductById = async ({
     productId,
+    userId,
+    isClient,
     queryRunner
   }: IGetProductById): AsyncResponse<Product> => {
     let code: ResponseCode = ResponseCode.OK
@@ -422,10 +424,66 @@ export class ProductsService implements IProductService {
           )
         : []
 
-      // Sort prices by minQuantity
-      const prices = product.prices
-        ? [...product.prices].sort((a, b) => a.minQuantity - b.minQuantity)
-        : []
+      // Determine which prices to use: client-specific if user is a client, otherwise general prices
+      let prices: Array<{
+        id: string
+        minQuantity: number
+        maxQuantity: number | null
+        price: number
+        createdAt: Date
+        updatedAt: Date
+      }> = []
+
+      if (isClient && userId) {
+        // If user is a client, fetch and use client-specific prices
+        const clientPrices = await this.clientProductPriceRepository.find({
+          where: {
+            clientId: userId,
+            productId: productId
+          },
+          order: { minQuantity: 'ASC' }
+        })
+
+        if (clientPrices.length > 0) {
+          // Use client-specific prices
+          prices = clientPrices.map((price) => ({
+            id: price.id,
+            minQuantity: price.minQuantity,
+            maxQuantity: price.maxQuantity ?? null,
+            price: price.price,
+            createdAt: price.createdAt,
+            updatedAt: price.updatedAt
+          }))
+        } else {
+          // If no client prices exist, fall back to general prices
+          prices = product.prices
+            ? [...product.prices]
+                .sort((a, b) => a.minQuantity - b.minQuantity)
+                .map((price) => ({
+                  id: price.id,
+                  minQuantity: price.minQuantity,
+                  maxQuantity: price.maxQuantity ?? null,
+                  price: price.price,
+                  createdAt: price.createdAt,
+                  updatedAt: price.updatedAt
+                }))
+            : []
+        }
+      } else {
+        // For non-client users, use general product prices
+        prices = product.prices
+          ? [...product.prices]
+              .sort((a, b) => a.minQuantity - b.minQuantity)
+              .map((price) => ({
+                id: price.id,
+                minQuantity: price.minQuantity,
+                maxQuantity: price.maxQuantity ?? null,
+                price: price.price,
+                createdAt: price.createdAt,
+                updatedAt: price.updatedAt
+              }))
+          : []
+      }
 
       // Get all services with their default prices
       const allServices = await this.serviceRepository.find({

@@ -32,7 +32,9 @@ const orderAdditionalCostSchema = Joi.object({
   additionalCostId: uuidSchema.required(),
   price: Joi.number().precision(4).positive().required(),
   quantity: Joi.number().integer().min(1).allow(null).optional(),
-  quantityByProduct: Joi.array().items(orderAdditionalCostProductSchema).optional()
+  quantityByProduct: Joi.array()
+    .items(orderAdditionalCostProductSchema)
+    .optional()
 })
 
 const baseOrderBody = {
@@ -49,6 +51,7 @@ const baseOrderBody = {
   street: Joi.string().max(255).allow('', null).optional(),
   contactPerson: Joi.string().max(128).allow('', null).optional(),
   contactPersonContact: Joi.string().max(255).allow('', null).optional(),
+  discount: Joi.number().precision(2).positive().allow(null).optional(),
   products: Joi.array().items(orderProductSchema).optional(),
   services: Joi.array().items(orderServiceSchema).optional(),
   additionalCosts: Joi.array().items(orderAdditionalCostSchema).optional()
@@ -111,6 +114,7 @@ export const createOrderSchema = (req: Request) => {
       street: req.body.street ?? null,
       contactPerson: req.body.contactPerson ?? null,
       contactPersonContact: req.body.contactPersonContact ?? null,
+      discount: req.body.discount ?? null,
       products: req.body.products ?? [],
       services: req.body.services ?? [],
       additionalCosts: req.body.additionalCosts ?? []
@@ -146,6 +150,7 @@ export const updateOrderSchema = (req: Request) => {
       street: req.body.street ?? null,
       contactPerson: req.body.contactPerson ?? null,
       contactPersonContact: req.body.contactPersonContact ?? null,
+      discount: req.body.discount ?? null,
       products: req.body.products,
       services: req.body.services,
       additionalCosts: req.body.additionalCosts

@@ -1,4 +1,4 @@
-import { Repository } from 'typeorm'
+import { Repository, In } from 'typeorm'
 import { autoInjectable } from 'tsyringe'
 
 import { AsyncResponse, ResponseCode } from '../../interface'
@@ -6,7 +6,6 @@ import { AppDataSource } from '../../services/typeorm'
 import { logger } from '../../logger'
 import { getResponseMessage } from '../../services/utils'
 import { getFileURL } from '../../services/cpanel'
-import { AcquisitionType } from '../products/interface'
 import { ProductMedia } from '../products/productsMediaModel'
 import {
   ICreateOrder,
@@ -27,6 +26,12 @@ import { OrderAdditionalCostProduct } from './orderAdditionalCostProductModel'
 import { AdditionalCost } from '../additional_costs/additionalCostModel'
 import { BillingType, MethodOfPayment } from '../additional_costs/interface'
 import { OrderStatus, getStatusDescription } from './orderStatus'
+import { ProductState } from '../product_state/productStateModel'
+import {
+  ProductStateStatus,
+  ProductStateLocation
+} from '../product_state/interface'
+import { AcquisitionType } from '../products/interface'
 
 type ListOrdersResponse = Awaited<AsyncResponse<IOrdersPagination>>
 type OrderResponse = Awaited<AsyncResponse<Order>>
@@ -40,6 +45,7 @@ export class OrdersService implements IOrderService {
   private readonly orderServiceProductRepository: Repository<OrderServiceProduct>
   private readonly orderAdditionalCostRepository: Repository<OrderAdditionalCost>
   private readonly orderAdditionalCostProductRepository: Repository<OrderAdditionalCostProduct>
+  private readonly productStateRepository: Repository<ProductState>
 
   constructor() {
     this.orderRepository = AppDataSource.manager.getRepository(Order)
@@ -53,6 +59,8 @@ export class OrdersService implements IOrderService {
       AppDataSource.manager.getRepository(OrderAdditionalCost)
     this.orderAdditionalCostProductRepository =
       AppDataSource.manager.getRepository(OrderAdditionalCostProduct)
+    this.productStateRepository =
+      AppDataSource.manager.getRepository(ProductState)
   }
 
   private async generateOrderNumber(
@@ -77,6 +85,7 @@ export class OrdersService implements IOrderService {
     limit = 25,
     status,
     customerId,
+    serviceUserId,
     queryRunner
   }: IListOrders): AsyncResponse<IOrdersPagination> => {
     let code: ResponseCode = ResponseCode.OK
@@ -97,6 +106,18 @@ export class OrdersService implements IOrderService {
 
       if (customerId) {
         query.andWhere('order.customerId = :customerId', { customerId })
+      }
+
+      // If serviceUserId is provided, filter orders to only show orders where
+      // at least one service has a service location that belongs to this user
+      if (serviceUserId) {
+        query
+          .innerJoin('order.services', 'filterService')
+          .innerJoin('filterService.serviceLocation', 'filterServiceLocation')
+          .andWhere('filterServiceLocation.userId = :serviceUserId', {
+            serviceUserId
+          })
+          .distinct(true)
       }
 
       if (search) {
@@ -351,6 +372,7 @@ export class OrdersService implements IOrderService {
     street,
     contactPerson,
     contactPersonContact,
+    discount,
     products,
     services,
     additionalCosts,
@@ -383,7 +405,8 @@ export class OrdersService implements IOrderService {
         place: place ?? null,
         street: street ?? null,
         contactPerson: contactPerson ?? null,
-        contactPersonContact: contactPersonContact ?? null
+        contactPersonContact: contactPersonContact ?? null,
+        discount: discount ?? null
       })
 
       const savedOrder = await orderRepository.save(order)
@@ -609,6 +632,7 @@ export class OrdersService implements IOrderService {
     street,
     contactPerson,
     contactPersonContact,
+    discount,
     products,
     services,
     additionalCosts,
@@ -626,15 +650,28 @@ export class OrdersService implements IOrderService {
         manager.getRepository(OrderAdditionalCost)
       const additionalCostRepository = manager.getRepository(AdditionalCost)
 
-      // Check if order exists
+      // Check if order exists and load with relationships if status is changing
       const existingOrder = await orderRepository.findOne({
-        where: { id: orderId }
+        where: { id: orderId },
+        relations:
+          typeof status !== 'undefined' && status === OrderStatus.IN_PRODUCTION
+            ? [
+                'products',
+                'products.product',
+                'services',
+                'services.serviceLocation',
+                'services.products',
+                'services.products.product',
+                'customer'
+              ]
+            : []
       })
 
       if (!existingOrder) {
         return { code: ResponseCode.NOT_FOUND }
       }
 
+      const previousStatus = existingOrder.status
       const updateData: Partial<Order> = {}
 
       // Order number is immutable and cannot be updated
@@ -670,6 +707,9 @@ export class OrdersService implements IOrderService {
       }
       if (typeof contactPersonContact !== 'undefined') {
         updateData.contactPersonContact = contactPersonContact ?? null
+      }
+      if (typeof discount !== 'undefined') {
+        updateData.discount = discount ?? null
       }
 
       if (Object.keys(updateData).length > 0) {
@@ -874,6 +914,437 @@ export class OrdersService implements IOrderService {
         }
       }
 
+      // Handle product state updates when status changes to IN_PRODUCTION or FINAL_PAYMENT_PENDING
+      if (
+        typeof status !== 'undefined' &&
+        existingOrder.customerId &&
+        (status === OrderStatus.IN_PRODUCTION ||
+          status === OrderStatus.FINAL_PAYMENT_PENDING)
+      ) {
+        // Reload order with all relationships for processing
+        const orderForProcessing = await orderRepository.findOne({
+          where: { id: orderId },
+          relations: [
+            'products',
+            'products.product',
+            'services',
+            'services.serviceLocation',
+            'services.products',
+            'services.products.product',
+            'additionalCosts',
+            'additionalCosts.additionalCost',
+            'additionalCosts.products',
+            'additionalCosts.products.product',
+            'customer'
+          ]
+        })
+
+        if (orderForProcessing) {
+          // Handle IN_PRODUCTION status change
+          if (
+            status === OrderStatus.IN_PRODUCTION &&
+            previousStatus !== OrderStatus.IN_PRODUCTION
+          ) {
+            const isBuyOrder =
+              orderForProcessing.acquisitionType === AcquisitionType.BUY
+            const targetStatus = isBuyOrder
+              ? ProductStateStatus.OWNED_BY_CLIENT
+              : ProductStateStatus.IN_USE
+
+            // Track processed products to prevent duplicates
+            const processedProducts = new Map<string, number>()
+
+            // Process products from order services
+            if (
+              orderForProcessing.services &&
+              orderForProcessing.services.length > 0
+            ) {
+              for (const orderService of orderForProcessing.services) {
+                if (
+                  !orderService.serviceLocationId ||
+                  !orderService.products ||
+                  orderService.products.length === 0
+                ) {
+                  continue
+                }
+
+                for (const orderServiceProduct of orderService.products) {
+                  const key = `${orderServiceProduct.productId}-${orderService.serviceLocationId}`
+                  const alreadyProcessed = processedProducts.get(key) || 0
+                  const quantityToProcess =
+                    orderServiceProduct.quantity - alreadyProcessed
+
+                  if (quantityToProcess > 0) {
+                    await this.processProductForOrder(
+                      orderServiceProduct.productId,
+                      quantityToProcess,
+                      orderService.serviceLocationId,
+                      orderForProcessing.customerId!,
+                      targetStatus,
+                      manager
+                    )
+                    processedProducts.set(
+                      key,
+                      (processedProducts.get(key) || 0) + quantityToProcess
+                    )
+                  }
+                }
+              }
+            }
+
+            // Process additional costs with calculationStatus
+            if (
+              orderForProcessing.additionalCosts &&
+              orderForProcessing.additionalCosts.length > 0
+            ) {
+              for (const orderAdditionalCost of orderForProcessing.additionalCosts) {
+                // Only process if additional cost has calculationStatus and products
+                if (
+                  !orderAdditionalCost.additionalCost?.calculationStatus ||
+                  !orderAdditionalCost.products ||
+                  orderAdditionalCost.products.length === 0
+                ) {
+                  continue
+                }
+
+                const calculationStatus =
+                  orderAdditionalCost.additionalCost.calculationStatus
+
+                // Find the service location from services in the order
+                let serviceLocationId: string | null = null
+                if (
+                  orderForProcessing.services &&
+                  orderForProcessing.services.length > 0 &&
+                  orderForProcessing.services[0].serviceLocationId
+                ) {
+                  serviceLocationId =
+                    orderForProcessing.services[0].serviceLocationId
+                }
+
+                for (const additionalCostProduct of orderAdditionalCost.products) {
+                  const key = `${additionalCostProduct.productId}-${
+                    serviceLocationId || 'none'
+                  }-additional-${orderAdditionalCost.id}`
+                  const alreadyProcessed = processedProducts.get(key) || 0
+                  const quantityToProcess =
+                    additionalCostProduct.quantity - alreadyProcessed
+
+                  if (quantityToProcess > 0) {
+                    await this.processProductForOrder(
+                      additionalCostProduct.productId,
+                      quantityToProcess,
+                      serviceLocationId,
+                      orderForProcessing.customerId!,
+                      calculationStatus,
+                      manager
+                    )
+                    processedProducts.set(
+                      key,
+                      (processedProducts.get(key) || 0) + quantityToProcess
+                    )
+                  }
+                }
+              }
+            }
+          }
+
+          // Handle FINAL_PAYMENT_PENDING status change
+          if (
+            status === OrderStatus.FINAL_PAYMENT_PENDING &&
+            previousStatus !== OrderStatus.FINAL_PAYMENT_PENDING
+          ) {
+            const productStateRepository = manager.getRepository(ProductState)
+
+            // Find all product states that belong to this order's customer
+            // We need to return products that are in use (for rent), owned (for buy), or have calculationStatus from additional costs
+            const baseStatus =
+              orderForProcessing.acquisitionType === AcquisitionType.BUY
+                ? ProductStateStatus.OWNED_BY_CLIENT
+                : ProductStateStatus.IN_USE
+
+            // Get all possible statuses that might need to be returned
+            // This includes base status and any calculationStatus from additional costs
+            const statusesToReturn = new Set<ProductStateStatus>([baseStatus])
+            if (
+              orderForProcessing.additionalCosts &&
+              orderForProcessing.additionalCosts.length > 0
+            ) {
+              for (const orderAdditionalCost of orderForProcessing.additionalCosts) {
+                if (orderAdditionalCost.additionalCost?.calculationStatus) {
+                  statusesToReturn.add(
+                    orderAdditionalCost.additionalCost.calculationStatus
+                  )
+                }
+              }
+            }
+
+            // Find all product states with any of these statuses
+            const productStatesToReturn = await productStateRepository.find({
+              where: {
+                userId: orderForProcessing.customerId!,
+                location: ProductStateLocation.USER,
+                status: In(Array.from(statusesToReturn))
+              },
+              relations: ['product']
+            })
+
+            // Track which product states should have calculationStatus (to exclude from service return)
+            const calculationStatusStateIds = new Set<string>()
+
+            // FIRST: Process additional costs with calculationStatus
+            // We need to process these FIRST to ensure the exact quantities with calculationStatus are returned correctly
+            if (
+              orderForProcessing.additionalCosts &&
+              orderForProcessing.additionalCosts.length > 0
+            ) {
+              for (const orderAdditionalCost of orderForProcessing.additionalCosts) {
+                if (
+                  !orderAdditionalCost.additionalCost?.calculationStatus ||
+                  !orderAdditionalCost.products ||
+                  orderAdditionalCost.products.length === 0
+                ) {
+                  continue
+                }
+
+                const calculationStatus =
+                  orderAdditionalCost.additionalCost.calculationStatus
+
+                for (const additionalCostProduct of orderAdditionalCost.products) {
+                  // Reload states from database for this product to get latest state
+                  // Find product states for this product that belong to the customer with base status
+                  // We need to process the exact quantity that was entered for this additional cost
+                  const statesForProduct = await productStateRepository.find({
+                    where: {
+                      productId: additionalCostProduct.productId,
+                      userId: orderForProcessing.customerId!,
+                      location: ProductStateLocation.USER,
+                      status: baseStatus
+                    },
+                    relations: ['product'],
+                    order: { createdAt: 'ASC' }
+                  })
+
+                  // Track how much quantity we need to process for this additional cost product
+                  let quantityToProcess = additionalCostProduct.quantity
+
+                  for (const state of statesForProduct) {
+                    if (quantityToProcess <= 0) {
+                      break
+                    }
+
+                    // Skip if this state is already marked as calculationStatus
+                    if (calculationStatusStateIds.has(state.id)) {
+                      continue
+                    }
+
+                    // For products with calculationStatus, keep them with the customer (location USER, holder customer)
+                    // Determine how much to process from this state
+                    const quantityFromState = Math.min(
+                      state.quantity,
+                      quantityToProcess
+                    )
+
+                    if (quantityFromState === state.quantity) {
+                      // Update entire state to have calculationStatus, keep with customer (location USER, holder customer)
+                      state.status = calculationStatus
+                      state.location = ProductStateLocation.USER
+                      state.userId = orderForProcessing.customerId
+                      state.serviceId = null // Clear serviceId when location is USER
+                      state.serviceLocationId = null // Clear serviceLocationId when location is USER (holder is user, not service)
+
+                      await productStateRepository.save(state)
+                      calculationStatusStateIds.add(state.id) // Mark as calculationStatus state
+                    } else {
+                      // Split: reduce this state's quantity and create new state with calculationStatus
+                      state.quantity -= quantityFromState
+                      await productStateRepository.save(state)
+                      // Original state still has quantity and baseStatus, will be returned to service
+
+                      // Create new state with calculationStatus for the customer (location USER, holder customer)
+                      const newState = productStateRepository.create({
+                        status: calculationStatus,
+                        location: ProductStateLocation.USER,
+                        quantity: quantityFromState,
+                        productId: state.productId,
+                        userId: orderForProcessing.customerId,
+                        serviceId: null, // No serviceId when location is USER
+                        serviceLocationId: null // No serviceLocationId when location is USER (holder is user, not service)
+                      })
+                      const savedNewState = await productStateRepository.save(
+                        newState
+                      )
+                      calculationStatusStateIds.add(savedNewState.id) // Mark new state as calculationStatus state
+                    }
+
+                    quantityToProcess -= quantityFromState
+                  }
+                }
+              }
+            }
+
+            // SECOND: Process products from order services
+            // Reload states to get the latest state after processing additional costs
+            // Find all product states that still belong to the customer with base status
+            // Exclude any states that have calculationStatus (they should stay with customer)
+            const remainingProductStates = await productStateRepository.find({
+              where: {
+                userId: orderForProcessing.customerId!,
+                location: ProductStateLocation.SERVICE,
+                status: baseStatus
+              },
+              relations: ['product']
+            })
+
+            // Filter out calculationStatus states
+            const statesToReturnToService = remainingProductStates.filter(
+              (ps) => !calculationStatusStateIds.has(ps.id)
+            )
+
+            // Only return states with baseStatus that haven't been processed for calculationStatus
+            const productStateMap = new Map<
+              string,
+              {
+                productState: ProductState
+                originalServiceLocationId: string | null
+              }
+            >()
+
+            // Build a map of products that should be returned based on order services
+            if (
+              orderForProcessing.services &&
+              orderForProcessing.services.length > 0
+            ) {
+              for (const orderService of orderForProcessing.services) {
+                if (
+                  !orderService.serviceLocationId ||
+                  !orderService.products ||
+                  orderService.products.length === 0
+                ) {
+                  continue
+                }
+
+                for (const orderServiceProduct of orderService.products) {
+                  // Find product states for this product that belong to the customer with base status (IN_USE or OWNED_BY_CLIENT)
+                  // Exclude states that have calculationStatus (they should stay with customer)
+                  const statesForProduct = statesToReturnToService.filter(
+                    (ps) =>
+                      ps.productId === orderServiceProduct.productId &&
+                      ps.status === baseStatus &&
+                      !productStateMap.has(ps.id)
+                  )
+
+                  // Track how much quantity we need to return for this service product
+                  let quantityToReturn = orderServiceProduct.quantity
+
+                  for (const state of statesForProduct) {
+                    if (quantityToReturn <= 0) {
+                      break
+                    }
+
+                    // Use the original serviceLocationId if available, otherwise use the current order service location
+                    const returnLocationId =
+                      state.serviceLocationId || orderService.serviceLocationId
+
+                    if (!returnLocationId) {
+                      continue // Skip if no service location to return to
+                    }
+
+                    // Determine how much to return from this state
+                    const quantityFromState = Math.min(
+                      state.quantity,
+                      quantityToReturn
+                    )
+
+                    if (!productStateMap.has(state.id)) {
+                      if (quantityFromState === state.quantity) {
+                        // Return entire state
+                        productStateMap.set(state.id, {
+                          productState: state,
+                          originalServiceLocationId: returnLocationId
+                        })
+                      } else {
+                        // Split: reduce this state's quantity and mark part for return
+                        state.quantity -= quantityFromState
+                        await productStateRepository.save(state)
+
+                        // Create new state with AVAILABLE status for the returned quantity
+                        // Holder should be service location (serviceLocationId set, userId null)
+                        const returnedState = productStateRepository.create({
+                          status: ProductStateStatus.AVAILABLE,
+                          location: ProductStateLocation.SERVICE,
+                          quantity: quantityFromState,
+                          productId: state.productId,
+                          serviceLocationId: returnLocationId,
+                          serviceId: null, // Clear serviceId when location is SERVICE (holder is service location, not service)
+                          userId: null // Clear userId when location is SERVICE (holder is service location, not user)
+                        })
+                        await productStateRepository.save(returnedState)
+                      }
+
+                      quantityToReturn -= quantityFromState
+                    }
+                  }
+                }
+              }
+            }
+
+            // Return products to their original service locations
+            for (const [
+              stateId,
+              { productState, originalServiceLocationId }
+            ] of productStateMap) {
+              if (!originalServiceLocationId) {
+                continue
+              }
+
+              // Defensive check: never process calculationStatus states
+              if (calculationStatusStateIds.has(productState.id)) {
+                continue
+              }
+
+              // Change status to AVAILABLE, location to SERVICE, and restore serviceLocationId
+              // Holder should be service location (serviceLocationId set, userId null)
+              productState.status = ProductStateStatus.AVAILABLE
+              productState.location = ProductStateLocation.SERVICE
+              productState.serviceLocationId = originalServiceLocationId
+              productState.serviceId = null // Clear serviceId when location is SERVICE (holder is service location, not service)
+              productState.userId = null // Clear userId when location is SERVICE (holder is service location, not user)
+
+              await productStateRepository.save(productState)
+            }
+
+            // Final verification: Ensure all calculationStatus states are correct
+            // Reload and fix any calculationStatus states that might have been incorrectly modified
+            if (calculationStatusStateIds.size > 0) {
+              const calculationStatusStates = await productStateRepository.find(
+                {
+                  where: {
+                    id: In(Array.from(calculationStatusStateIds)),
+                    userId: orderForProcessing.customerId!
+                  }
+                }
+              )
+
+              for (const state of calculationStatusStates) {
+                // Ensure calculationStatus states are location USER with customer as holder
+                if (
+                  state.location !== ProductStateLocation.USER ||
+                  state.userId !== orderForProcessing.customerId ||
+                  state.serviceLocationId !== null ||
+                  state.serviceId !== null
+                ) {
+                  state.location = ProductStateLocation.USER
+                  state.userId = orderForProcessing.customerId
+                  state.serviceId = null
+                  state.serviceLocationId = null
+                  await productStateRepository.save(state)
+                }
+              }
+            }
+          }
+        }
+      }
+
       // Reload order with relationships
       const { order, code: getCode } = await this.getOrderById({
         orderId,
@@ -937,15 +1408,27 @@ export class OrdersService implements IOrderService {
     try {
       const manager = queryRunner ? queryRunner.manager : AppDataSource.manager
       const orderRepository = manager.getRepository(Order)
+      const productStateRepository = manager.getRepository(ProductState)
 
-      // Check if order exists
+      // Check if order exists and load with relationships
       const existingOrder = await orderRepository.findOne({
-        where: { id: orderId }
+        where: { id: orderId },
+        relations: [
+          'products',
+          'products.product',
+          'services',
+          'services.serviceLocation',
+          'services.products',
+          'services.products.product',
+          'customer'
+        ]
       })
 
       if (!existingOrder) {
         return { code: ResponseCode.NOT_FOUND }
       }
+
+      const previousStatus = existingOrder.status
 
       // Update only the status
       await orderRepository
@@ -954,6 +1437,437 @@ export class OrdersService implements IOrderService {
         .set({ status })
         .where('id = :orderId', { orderId })
         .execute()
+
+      // Load additional costs with products for processing
+      const orderWithAdditionalCosts = await orderRepository.findOne({
+        where: { id: orderId },
+        relations: [
+          'products',
+          'products.product',
+          'services',
+          'services.serviceLocation',
+          'services.products',
+          'services.products.product',
+          'additionalCosts',
+          'additionalCosts.additionalCost',
+          'additionalCosts.products',
+          'additionalCosts.products.product',
+          'customer'
+        ]
+      })
+
+      // Handle product state updates when status changes to IN_PRODUCTION
+      // Process for both BUY (OWNED_BY_CLIENT) and RENT (IN_USE) orders
+      if (
+        status === OrderStatus.IN_PRODUCTION &&
+        previousStatus !== OrderStatus.IN_PRODUCTION &&
+        orderWithAdditionalCosts &&
+        orderWithAdditionalCosts.customerId
+      ) {
+        const isBuyOrder =
+          orderWithAdditionalCosts.acquisitionType === AcquisitionType.BUY
+        const targetStatus = isBuyOrder
+          ? ProductStateStatus.OWNED_BY_CLIENT
+          : ProductStateStatus.IN_USE
+
+        // Track processed products to prevent duplicates
+        const processedProducts = new Map<string, number>()
+
+        // Process products from order services
+        if (
+          orderWithAdditionalCosts.services &&
+          orderWithAdditionalCosts.services.length > 0
+        ) {
+          for (const orderService of orderWithAdditionalCosts.services) {
+            if (
+              !orderService.serviceLocationId ||
+              !orderService.products ||
+              orderService.products.length === 0
+            ) {
+              continue
+            }
+
+            for (const orderServiceProduct of orderService.products) {
+              const key = `${orderServiceProduct.productId}-${orderService.serviceLocationId}`
+              const alreadyProcessed = processedProducts.get(key) || 0
+              const quantityToProcess =
+                orderServiceProduct.quantity - alreadyProcessed
+
+              if (quantityToProcess > 0) {
+                await this.processProductForOrder(
+                  orderServiceProduct.productId,
+                  quantityToProcess,
+                  orderService.serviceLocationId,
+                  orderWithAdditionalCosts.customerId,
+                  targetStatus,
+                  manager
+                )
+                processedProducts.set(
+                  key,
+                  (processedProducts.get(key) || 0) + quantityToProcess
+                )
+              }
+            }
+          }
+        }
+
+        // Process additional costs with calculationStatus
+        if (
+          orderWithAdditionalCosts.additionalCosts &&
+          orderWithAdditionalCosts.additionalCosts.length > 0
+        ) {
+          for (const orderAdditionalCost of orderWithAdditionalCosts.additionalCosts) {
+            // Only process if additional cost has calculationStatus and products
+            if (
+              !orderAdditionalCost.additionalCost?.calculationStatus ||
+              !orderAdditionalCost.products ||
+              orderAdditionalCost.products.length === 0
+            ) {
+              continue
+            }
+
+            const calculationStatus =
+              orderAdditionalCost.additionalCost.calculationStatus
+
+            // Find the service location from services in the order
+            let serviceLocationId: string | null = null
+            if (
+              orderWithAdditionalCosts.services &&
+              orderWithAdditionalCosts.services.length > 0 &&
+              orderWithAdditionalCosts.services[0].serviceLocationId
+            ) {
+              serviceLocationId =
+                orderWithAdditionalCosts.services[0].serviceLocationId
+            }
+
+            for (const additionalCostProduct of orderAdditionalCost.products) {
+              const key = `${additionalCostProduct.productId}-${
+                serviceLocationId || 'none'
+              }-additional-${orderAdditionalCost.id}`
+              const alreadyProcessed = processedProducts.get(key) || 0
+              const quantityToProcess =
+                additionalCostProduct.quantity - alreadyProcessed
+
+              if (quantityToProcess > 0) {
+                await this.processProductForOrder(
+                  additionalCostProduct.productId,
+                  quantityToProcess,
+                  serviceLocationId,
+                  orderWithAdditionalCosts.customerId,
+                  calculationStatus,
+                  manager
+                )
+                processedProducts.set(
+                  key,
+                  (processedProducts.get(key) || 0) + quantityToProcess
+                )
+              }
+            }
+          }
+        }
+      }
+
+      // Handle product state updates when status changes to FINAL_PAYMENT_PENDING
+      // Return products from user back to original service with AVAILABLE status
+      if (
+        status === OrderStatus.FINAL_PAYMENT_PENDING &&
+        previousStatus !== OrderStatus.FINAL_PAYMENT_PENDING &&
+        orderWithAdditionalCosts &&
+        orderWithAdditionalCosts.customerId
+      ) {
+        // Find all product states that belong to this order's customer
+        // We need to return products that are in use (for rent), owned (for buy), or have calculationStatus from additional costs
+        const baseStatus =
+          orderWithAdditionalCosts.acquisitionType === AcquisitionType.BUY
+            ? ProductStateStatus.OWNED_BY_CLIENT
+            : ProductStateStatus.IN_USE
+
+        // Get all possible statuses that might need to be returned
+        // This includes base status and any calculationStatus from additional costs
+        const statusesToReturn = new Set<ProductStateStatus>([baseStatus])
+        if (
+          orderWithAdditionalCosts.additionalCosts &&
+          orderWithAdditionalCosts.additionalCosts.length > 0
+        ) {
+          for (const orderAdditionalCost of orderWithAdditionalCosts.additionalCosts) {
+            if (orderAdditionalCost.additionalCost?.calculationStatus) {
+              statusesToReturn.add(
+                orderAdditionalCost.additionalCost.calculationStatus
+              )
+            }
+          }
+        }
+
+        // Find all product states with any of these statuses
+        const productStatesToReturn = await productStateRepository.find({
+          where: {
+            userId: orderWithAdditionalCosts.customerId,
+            location: ProductStateLocation.USER,
+            status: In(Array.from(statusesToReturn))
+          },
+          relations: ['product']
+        })
+
+        // Track which product states should have calculationStatus (to exclude from service return)
+        const calculationStatusStateIds = new Set<string>()
+
+        // FIRST: Process additional costs with calculationStatus
+        // We need to process these FIRST to ensure the exact quantities with calculationStatus are returned correctly
+        if (
+          orderWithAdditionalCosts.additionalCosts &&
+          orderWithAdditionalCosts.additionalCosts.length > 0
+        ) {
+          for (const orderAdditionalCost of orderWithAdditionalCosts.additionalCosts) {
+            if (
+              !orderAdditionalCost.additionalCost?.calculationStatus ||
+              !orderAdditionalCost.products ||
+              orderAdditionalCost.products.length === 0
+            ) {
+              continue
+            }
+
+            const calculationStatus =
+              orderAdditionalCost.additionalCost.calculationStatus
+
+            for (const additionalCostProduct of orderAdditionalCost.products) {
+              // Reload states from database for this product to get latest state
+              // Find product states for this product that belong to the customer with base status
+              // We need to process the exact quantity that was entered for this additional cost
+              const statesForProduct = await productStateRepository.find({
+                where: {
+                  productId: additionalCostProduct.productId,
+                  userId: orderWithAdditionalCosts.customerId,
+                  location: ProductStateLocation.USER,
+                  status: baseStatus
+                },
+                relations: ['product'],
+                order: { createdAt: 'ASC' }
+              })
+
+              // Track how much quantity we need to process for this additional cost product
+              let quantityToProcess = additionalCostProduct.quantity
+
+              for (const state of statesForProduct) {
+                if (quantityToProcess <= 0) {
+                  break
+                }
+
+                // Skip if this state is already marked as calculationStatus
+                if (calculationStatusStateIds.has(state.id)) {
+                  continue
+                }
+
+                // For products with calculationStatus, keep them with the customer (location USER, holder customer)
+                // Determine how much to process from this state
+                const quantityFromState = Math.min(
+                  state.quantity,
+                  quantityToProcess
+                )
+
+                if (quantityFromState === state.quantity) {
+                  // Update entire state to have calculationStatus, keep with customer (location USER, holder customer)
+                  state.status = calculationStatus
+                  state.location = ProductStateLocation.USER
+                  state.userId = orderWithAdditionalCosts.customerId
+                  state.serviceId = null // Clear serviceId when location is USER
+                  state.serviceLocationId = null // Clear serviceLocationId when location is USER (holder is user, not service)
+
+                  await productStateRepository.save(state)
+                  calculationStatusStateIds.add(state.id) // Mark as calculationStatus state
+                } else {
+                  // Split: reduce this state's quantity and create new state with calculationStatus
+                  state.quantity -= quantityFromState
+                  await productStateRepository.save(state)
+                  // Original state still has quantity and baseStatus, will be returned to service
+
+                  // Create new state with calculationStatus for the customer (location USER, holder customer)
+                  const newState = productStateRepository.create({
+                    status: calculationStatus,
+                    location: ProductStateLocation.USER,
+                    quantity: quantityFromState,
+                    productId: state.productId,
+                    userId: orderWithAdditionalCosts.customerId,
+                    serviceId: null, // No serviceId when location is USER
+                    serviceLocationId: null // No serviceLocationId when location is USER (holder is user, not service)
+                  })
+                  const savedNewState = await productStateRepository.save(
+                    newState
+                  )
+                  calculationStatusStateIds.add(savedNewState.id) // Mark new state as calculationStatus state
+                }
+
+                quantityToProcess -= quantityFromState
+              }
+            }
+          }
+        }
+
+        // SECOND: Process products from order services
+        // Reload states to get the latest state after processing additional costs
+        // Find all product states that still belong to the customer with base status
+        // Exclude any states that have calculationStatus (they should stay with customer)
+        const remainingProductStates = await productStateRepository.find({
+          where: {
+            userId: orderWithAdditionalCosts.customerId,
+            location: ProductStateLocation.USER,
+            status: baseStatus
+          },
+          relations: ['product']
+        })
+
+        // Filter out calculationStatus states
+        const statesToReturnToService = remainingProductStates.filter(
+          (ps) => !calculationStatusStateIds.has(ps.id)
+        )
+
+        // Only return states with baseStatus that haven't been processed for calculationStatus
+        const productStateMap = new Map<
+          string,
+          {
+            productState: ProductState
+            originalServiceLocationId: string | null
+          }
+        >()
+
+        if (
+          orderWithAdditionalCosts.services &&
+          orderWithAdditionalCosts.services.length > 0
+        ) {
+          for (const orderService of orderWithAdditionalCosts.services) {
+            if (
+              !orderService.serviceLocationId ||
+              !orderService.products ||
+              orderService.products.length === 0
+            ) {
+              continue
+            }
+
+            for (const orderServiceProduct of orderService.products) {
+              // Find product states for this product that belong to the customer with base status (IN_USE or OWNED_BY_CLIENT)
+              // Exclude states that have calculationStatus (they should stay with customer)
+              const statesForProduct = statesToReturnToService.filter(
+                (ps) =>
+                  ps.productId === orderServiceProduct.productId &&
+                  ps.status === baseStatus &&
+                  !productStateMap.has(ps.id)
+              )
+
+              // Sort to prioritize states with matching preserved serviceLocationId
+              const sortedStates = statesForProduct.sort((a, b) => {
+                const aMatches =
+                  a.serviceLocationId === orderService.serviceLocationId ? 1 : 0
+                const bMatches =
+                  b.serviceLocationId === orderService.serviceLocationId ? 1 : 0
+                return bMatches - aMatches
+              })
+
+              // Track how much quantity we need to return for this service product
+              let quantityToReturn = orderServiceProduct.quantity
+
+              for (const state of sortedStates) {
+                if (quantityToReturn <= 0) {
+                  break
+                }
+
+                // Use preserved serviceLocationId if available, otherwise use order service location
+                const returnLocationId =
+                  state.serviceLocationId || orderService.serviceLocationId
+
+                if (!returnLocationId) {
+                  continue // Skip if no service location to return to
+                }
+
+                // Determine how much to return from this state
+                const quantityFromState = Math.min(
+                  state.quantity,
+                  quantityToReturn
+                )
+
+                if (!productStateMap.has(state.id)) {
+                  if (quantityFromState === state.quantity) {
+                    // Return entire state
+                    productStateMap.set(state.id, {
+                      productState: state,
+                      originalServiceLocationId: returnLocationId
+                    })
+                  } else {
+                    // Split: reduce this state's quantity and mark part for return
+                    state.quantity -= quantityFromState
+                    await productStateRepository.save(state)
+
+                    // Create new state with AVAILABLE status for the returned quantity
+                    // Holder should be service location (serviceLocationId set, userId null)
+                    const returnedState = productStateRepository.create({
+                      status: ProductStateStatus.AVAILABLE,
+                      location: ProductStateLocation.SERVICE,
+                      quantity: quantityFromState,
+                      productId: state.productId,
+                      serviceLocationId: returnLocationId,
+                      serviceId: null, // Clear serviceId when location is SERVICE (holder is service location, not service)
+                      userId: null // Clear userId when location is SERVICE (holder is service location, not user)
+                    })
+                    await productStateRepository.save(returnedState)
+                  }
+
+                  quantityToReturn -= quantityFromState
+                }
+              }
+            }
+          }
+        }
+
+        // Return products to their original service locations
+        for (const [
+          stateId,
+          { productState, originalServiceLocationId }
+        ] of productStateMap) {
+          if (!originalServiceLocationId) {
+            continue
+          }
+
+          // Defensive check: never process calculationStatus states
+          if (calculationStatusStateIds.has(productState.id)) {
+            continue
+          }
+
+          // Change status to AVAILABLE, location to SERVICE, and restore serviceLocationId
+          // Holder should be service location (serviceLocationId set, userId null)
+          productState.status = ProductStateStatus.AVAILABLE
+          productState.location = ProductStateLocation.SERVICE
+          productState.serviceLocationId = originalServiceLocationId
+          productState.serviceId = null // Clear serviceId when location is SERVICE (holder is service location, not service)
+          productState.userId = null // Clear userId when location is SERVICE (holder is service location, not user)
+
+          await productStateRepository.save(productState)
+        }
+
+        // Final verification: Ensure all calculationStatus states are correct
+        // Reload and fix any calculationStatus states that might have been incorrectly modified
+        if (calculationStatusStateIds.size > 0) {
+          const calculationStatusStates = await productStateRepository.find({
+            where: {
+              id: In(Array.from(calculationStatusStateIds)),
+              userId: orderWithAdditionalCosts.customerId
+            }
+          })
+
+          for (const state of calculationStatusStates) {
+            // Ensure calculationStatus states are location USER with customer as holder
+            if (
+              state.location !== ProductStateLocation.USER ||
+              state.userId !== orderWithAdditionalCosts.customerId ||
+              state.serviceLocationId !== null ||
+              state.serviceId !== null
+            ) {
+              state.location = ProductStateLocation.USER
+              state.userId = orderWithAdditionalCosts.customerId
+              state.serviceId = null
+              state.serviceLocationId = null
+              await productStateRepository.save(state)
+            }
+          }
+        }
+      }
 
       // Reload order with relationships
       const { order, code: getCode } = await this.getOrderById({
@@ -976,5 +1890,213 @@ export class OrdersService implements IOrderService {
     }
 
     return { code } as unknown as OrderResponse
+  }
+
+  /**
+   * Process a product for an order when status changes to IN_PRODUCTION
+   * - If there are available products in the service location, transfer them to the target status (IN_USE for rent, OWNED_BY_CLIENT for buy)
+   * - If there are not enough available products, create new ones with the target status
+   * - Preserves original serviceLocationId so products can be returned later
+   */
+  private async processProductForOrder(
+    productId: string,
+    quantityNeeded: number,
+    serviceLocationId: string | null,
+    customerId: string,
+    targetStatus: ProductStateStatus,
+    manager = AppDataSource.manager
+  ): Promise<void> {
+    const productStateRepository = manager.getRepository(ProductState)
+
+    // Check if products have already been assigned to this user for this product with the target status
+    // This prevents duplicate assignments if the method is called multiple times
+    // Consolidate all existing states for this product/user/status combination into one
+    const existingAssignedStates = await productStateRepository.find({
+      where: {
+        productId,
+        userId: customerId,
+        location: ProductStateLocation.USER,
+        status: targetStatus
+      },
+      order: { createdAt: 'ASC' } // Use oldest first
+    })
+
+    // Consolidate all existing states into one if there are multiple
+    let existingStateToUpdate: ProductState | null = null
+    if (existingAssignedStates.length > 0) {
+      existingStateToUpdate = existingAssignedStates[0]
+      // Ensure userId is set to customer (holder) and serviceId/serviceLocationId are null
+      existingStateToUpdate.userId = customerId
+      existingStateToUpdate.location = ProductStateLocation.USER
+      existingStateToUpdate.serviceId = null // Clear serviceId when location is USER
+      existingStateToUpdate.serviceLocationId = null // Clear serviceLocationId when location is USER (holder is user, not service)
+      // If there are multiple existing states, consolidate them into the first one
+      if (existingAssignedStates.length > 1) {
+        const totalQuantity = existingAssignedStates.reduce(
+          (sum, state) => sum + state.quantity,
+          0
+        )
+        existingStateToUpdate.quantity = totalQuantity
+        // Preserve the serviceLocationId from the first state (or merge logic could be improved)
+        // For now, we'll use the first state's serviceLocationId
+        await productStateRepository.save(existingStateToUpdate)
+
+        // Delete the other duplicate states
+        const statesToDelete = existingAssignedStates.slice(1)
+        await productStateRepository.remove(statesToDelete)
+      }
+    }
+
+    // If no service location, we can't check for available products
+    // In this case, create ONE new product state with target status and total quantity
+    // If user already has this product, update existing state quantity instead
+    if (!serviceLocationId) {
+      if (existingStateToUpdate) {
+        // User already has this product, just increase quantity
+        // Ensure userId is set to customer (holder) and serviceId/serviceLocationId are null
+        existingStateToUpdate.userId = customerId
+        existingStateToUpdate.location = ProductStateLocation.USER
+        existingStateToUpdate.serviceId = null // Clear serviceId when location is USER
+        existingStateToUpdate.serviceLocationId = null // Clear serviceLocationId when location is USER (holder is user, not service)
+        existingStateToUpdate.quantity += quantityNeeded
+        await productStateRepository.save(existingStateToUpdate)
+      } else {
+        // User doesn't have this product yet, create ONE state with total quantity
+        const newProductState = productStateRepository.create({
+          status: targetStatus,
+          location: ProductStateLocation.USER,
+          quantity: quantityNeeded,
+          productId,
+          userId: customerId,
+          serviceId: null, // No serviceId when location is USER
+          serviceLocationId: null // No original service location
+        })
+        await productStateRepository.save(newProductState)
+        existingStateToUpdate = newProductState // Track for potential future updates
+      }
+      return
+    }
+
+    // Find available products in the service location
+    const availableProductStates = await productStateRepository.find({
+      where: {
+        productId,
+        status: ProductStateStatus.AVAILABLE,
+        location: ProductStateLocation.SERVICE,
+        serviceLocationId
+      },
+      order: { createdAt: 'ASC' } // Use oldest first
+    })
+
+    // Calculate total available quantity
+    const totalAvailable = availableProductStates.reduce(
+      (sum, state) => sum + state.quantity,
+      0
+    )
+
+    let remainingNeeded = quantityNeeded
+
+    // Transfer available products to target status (IN_USE or OWNED_BY_CLIENT)
+    // Preserve original serviceLocationId so we can return products later
+    if (totalAvailable > 0 && remainingNeeded > 0) {
+      for (const productState of availableProductStates) {
+        if (remainingNeeded <= 0) {
+          break
+        }
+
+        const quantityToTransfer = Math.min(
+          productState.quantity,
+          remainingNeeded
+        )
+        const originalServiceLocationId = productState.serviceLocationId
+
+        if (quantityToTransfer === productState.quantity) {
+          // If user already has this product, update existing state quantity
+          // Otherwise, transfer entire state to target status with USER location
+          // Preserve serviceLocationId for later return
+          if (existingStateToUpdate) {
+            // User already has this product, just increase quantity
+            // Ensure userId is set to customer (holder) and serviceId/serviceLocationId are null
+            existingStateToUpdate.userId = customerId
+            existingStateToUpdate.location = ProductStateLocation.USER
+            existingStateToUpdate.serviceId = null // Clear serviceId when location is USER
+            existingStateToUpdate.serviceLocationId = null // Clear serviceLocationId when location is USER (holder is user, not service)
+            existingStateToUpdate.quantity += quantityToTransfer
+            await productStateRepository.save(existingStateToUpdate)
+            // Delete the transferred state since we're consolidating
+            await productStateRepository.remove(productState)
+          } else {
+            // User doesn't have this product yet, transfer state
+            productState.status = targetStatus
+            productState.location = ProductStateLocation.USER
+            productState.userId = customerId
+            productState.serviceId = null // Clear serviceId when location is USER
+            productState.serviceLocationId = null // Clear serviceLocationId when location is USER (holder is user, not service)
+            await productStateRepository.save(productState)
+            existingStateToUpdate = productState // Track this as the state to update
+          }
+          remainingNeeded -= quantityToTransfer
+        } else {
+          // Split the state: keep some as available, transfer some to target status
+          // Update existing state to reduce quantity
+          productState.quantity -= quantityToTransfer
+          await productStateRepository.save(productState)
+
+          // If user already has this product, update existing state quantity
+          // Otherwise, create new state with target status
+          // Preserve serviceLocationId for later return
+          if (existingStateToUpdate) {
+            // Ensure userId is set to customer (holder) and serviceId/serviceLocationId are null
+            existingStateToUpdate.userId = customerId
+            existingStateToUpdate.location = ProductStateLocation.USER
+            existingStateToUpdate.serviceId = null // Clear serviceId when location is USER
+            existingStateToUpdate.serviceLocationId = null // Clear serviceLocationId when location is USER (holder is user, not service)
+            existingStateToUpdate.quantity += quantityToTransfer
+            await productStateRepository.save(existingStateToUpdate)
+          } else {
+            const newState = productStateRepository.create({
+              status: targetStatus,
+              location: ProductStateLocation.USER,
+              quantity: quantityToTransfer,
+              productId,
+              userId: customerId,
+              serviceId: null, // No serviceId when location is USER
+              serviceLocationId: null // No serviceLocationId when location is USER (holder is user, not service)
+            })
+            await productStateRepository.save(newState)
+            existingStateToUpdate = newState // Track this as the state to update
+          }
+
+          remainingNeeded -= quantityToTransfer
+        }
+      }
+    }
+
+    // If still need more products, create ONE new state with target status and remaining quantity
+    // If user already has this product, update existing state quantity instead
+    if (remainingNeeded > 0) {
+      if (existingStateToUpdate) {
+        // User already has this product, just increase quantity
+        // Ensure userId is set to customer (holder) and serviceId/serviceLocationId are null
+        existingStateToUpdate.userId = customerId
+        existingStateToUpdate.location = ProductStateLocation.USER
+        existingStateToUpdate.serviceId = null // Clear serviceId when location is USER
+        existingStateToUpdate.serviceLocationId = null // Clear serviceLocationId when location is USER (holder is user, not service)
+        existingStateToUpdate.quantity += remainingNeeded
+        await productStateRepository.save(existingStateToUpdate)
+      } else {
+        // User doesn't have this product yet, create ONE state with remaining quantity
+        const newProductState = productStateRepository.create({
+          status: targetStatus,
+          location: ProductStateLocation.USER,
+          quantity: remainingNeeded,
+          productId,
+          userId: customerId,
+          serviceId: null, // No serviceId when location is USER
+          serviceLocationId: null // No serviceLocationId when location is USER (holder is user, not service)
+        })
+        await productStateRepository.save(newProductState)
+      }
+    }
   }
 }

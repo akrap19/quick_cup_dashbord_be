@@ -2,6 +2,7 @@ import { Request } from 'express'
 import Joi from 'joi'
 import { MethodOfPayment, BillingType } from './interface'
 import { AcquisitionType } from '../products/interface'
+import { ProductStateStatus } from '../product_state/interface'
 
 const uuidSchema = Joi.string().guid({ version: 'uuidv4' })
 
@@ -16,7 +17,18 @@ const baseAdditionalCostBody = {
   acquisitionType: Joi.string()
     .valid(AcquisitionType.BUY, AcquisitionType.RENT)
     .optional(),
-  price: Joi.number().precision(4).positive()
+  price: Joi.number().precision(4).positive(),
+  calculationStatus: Joi.string()
+    .valid(
+      ProductStateStatus.AVAILABLE,
+      ProductStateStatus.IN_USE,
+      ProductStateStatus.MAINTENANCE,
+      ProductStateStatus.RESERVED,
+      ProductStateStatus.DAMAGED,
+      ProductStateStatus.OWNED_BY_CLIENT
+    )
+    .allow(null)
+    .optional()
 }
 
 export const listAdditionalCostsSchema = (req: Request) => {
@@ -91,7 +103,8 @@ export const createAdditionalCostSchema = (req: Request) => {
       methodOfPayment: req.body.methodOfPayment,
       billingType: req.body.billingType,
       acquisitionType: req.body.acquisitionType,
-      price: req.body.price
+      price: req.body.price,
+      calculationStatus: req.body.calculationStatus
     }
   }
 }
@@ -111,7 +124,8 @@ export const updateAdditionalCostSchema = (req: Request) => {
       methodOfPayment: req.body.methodOfPayment,
       billingType: req.body.billingType,
       acquisitionType: req.body.acquisitionType,
-      price: req.body.price
+      price: req.body.price,
+      calculationStatus: req.body.calculationStatus
     }
   }
 }
@@ -128,4 +142,3 @@ export const additionalCostIdParamSchema = (req: Request) => {
     }
   }
 }
-

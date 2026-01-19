@@ -44,6 +44,7 @@ export interface ICreateOrder extends IServiceMethod {
   street?: string | null
   contactPerson?: string | null
   contactPersonContact?: string | null
+  discount?: number | null
   products?: IOrderProductInput[]
   services?: IOrderServiceInput[]
   additionalCosts?: IOrderAdditionalCostInput[]
@@ -62,6 +63,7 @@ export interface IUpdateOrder extends IServiceMethod {
   street?: string | null
   contactPerson?: string | null
   contactPersonContact?: string | null
+  discount?: number | null
   products?: IOrderProductInput[]
   services?: IOrderServiceInput[]
   additionalCosts?: IOrderAdditionalCostInput[]
@@ -82,6 +84,7 @@ export interface IListOrders extends IServiceMethod {
   limit?: number
   status?: string | null
   customerId?: string | null
+  serviceUserId?: string | null
 }
 
 export interface IUpdateOrderStatus extends IServiceMethod {

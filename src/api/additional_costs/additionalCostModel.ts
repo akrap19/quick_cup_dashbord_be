@@ -7,6 +7,7 @@ import {
 } from 'typeorm'
 import { AcquisitionType } from '../products/interface'
 import { MethodOfPayment, BillingType } from './interface'
+import { ProductStateStatus } from '../product_state/interface'
 import { decimalTransformer } from '../../services/utils'
 
 @Entity('additional_costs')
@@ -46,6 +47,14 @@ export class AdditionalCost {
   })
   price!: number
 
+  @Column({
+    name: 'calculation_status',
+    type: 'enum',
+    enum: ProductStateStatus,
+    nullable: true
+  })
+  calculationStatus?: ProductStateStatus | null
+
   @CreateDateColumn({
     name: 'created_at',
     type: 'timestamp',
@@ -66,12 +75,14 @@ export class AdditionalCost {
     methodOfPayment: MethodOfPayment,
     billingType: BillingType,
     acquisitionType: AcquisitionType,
-    price: number
+    price: number,
+    calculationStatus?: ProductStateStatus | null
   ) {
     this.name = name
     this.methodOfPayment = methodOfPayment
     this.billingType = billingType
     this.acquisitionType = acquisitionType
     this.price = price
+    this.calculationStatus = calculationStatus ?? null
   }
 }

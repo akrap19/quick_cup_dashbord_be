@@ -201,6 +201,18 @@ const definitions = {
         enum: ['buy', 'rent']
       },
       price: { type: 'number' },
+      calculationStatus: {
+        type: 'string',
+        enum: [
+          'available',
+          'in_use',
+          'maintenance',
+          'reserved',
+          'damaged',
+          'owned_by_client'
+        ],
+        nullable: true
+      },
       createdAt: { type: 'string', format: 'date-time' },
       updatedAt: { type: 'string', format: 'date-time' }
     },
@@ -231,9 +243,27 @@ const definitions = {
         type: 'string',
         enum: ['buy', 'rent']
       },
-      price: { type: 'number', minimum: 0 }
+      price: { type: 'number', minimum: 0 },
+      calculationStatus: {
+        type: 'string',
+        enum: [
+          'available',
+          'in_use',
+          'maintenance',
+          'reserved',
+          'damaged',
+          'owned_by_client'
+        ],
+        nullable: true
+      }
     },
-    required: ['name', 'methodOfPayment', 'billingType', 'acquisitionType', 'price']
+    required: [
+      'name',
+      'methodOfPayment',
+      'billingType',
+      'acquisitionType',
+      'price'
+    ]
   },
   update_additional_cost_body: {
     type: 'object',
@@ -251,7 +281,19 @@ const definitions = {
         type: 'string',
         enum: ['buy', 'rent']
       },
-      price: { type: 'number', minimum: 0 }
+      price: { type: 'number', minimum: 0 },
+      calculationStatus: {
+        type: 'string',
+        enum: [
+          'available',
+          'in_use',
+          'maintenance',
+          'reserved',
+          'damaged',
+          'owned_by_client'
+        ],
+        nullable: true
+      }
     }
   },
   additional_cost_response: {
@@ -291,4 +333,3 @@ const definitions = {
 }
 
 export const additionalCostDocs = { tags, paths, definitions }
-

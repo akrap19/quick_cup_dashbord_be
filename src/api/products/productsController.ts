@@ -3,6 +3,7 @@ import { autoInjectable } from 'tsyringe'
 
 import { ResponseCode } from '../../interface'
 import { ProductsService } from './productsService'
+import { RoleType } from '../role/interface'
 
 @autoInjectable()
 export class ProductsController {
@@ -45,8 +46,16 @@ export class ProductsController {
     const input = res.locals.input ?? {}
     const { productId } = input
 
+    // Check if user is a client
+    const isClient = req.user?.roles?.some(
+      (userRole) => userRole.role.name === RoleType.CLIENT
+    )
+    const userId = isClient ? req.user?.id : undefined
+
     const { product, code } = await this.productsService.getProductById({
-      productId
+      productId,
+      userId,
+      isClient
     })
 
     if (!product) {

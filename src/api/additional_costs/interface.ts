@@ -1,5 +1,6 @@
 import { AsyncResponse, IServiceMethod } from '../../interface'
 import { AcquisitionType } from '../products/interface'
+import { ProductStateStatus } from '../product_state/interface'
 import { AdditionalCost } from './additionalCostModel'
 
 export enum MethodOfPayment {
@@ -18,6 +19,7 @@ export interface ICreateAdditionalCost extends IServiceMethod {
   billingType: BillingType
   acquisitionType: AcquisitionType
   price: number
+  calculationStatus?: ProductStateStatus | null
 }
 
 export interface IUpdateAdditionalCost extends IServiceMethod {
@@ -27,6 +29,7 @@ export interface IUpdateAdditionalCost extends IServiceMethod {
   billingType?: BillingType
   acquisitionType?: AcquisitionType
   price?: number
+  calculationStatus?: ProductStateStatus | null
 }
 
 export interface IGetAdditionalCostById extends IServiceMethod {

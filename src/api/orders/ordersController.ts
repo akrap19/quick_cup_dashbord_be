@@ -28,12 +28,19 @@ export class OrdersController {
     )
     const customerId = isClient ? req.user?.id : null
 
+    // If user is a SERVICE, filter orders by service location userId
+    const isService = req.user?.roles?.some(
+      (userRole) => userRole.role.name === RoleType.SERVICE
+    )
+    const serviceUserId = isService ? req.user?.id : null
+
     const { orders, pagination, code } = await this.ordersService.listOrders({
       page: pageNumber,
       limit: limitNumber,
       search: searchTerm,
       status: statusFilter,
-      customerId
+      customerId,
+      serviceUserId
     })
 
     if (!orders || !pagination) {
@@ -84,6 +91,7 @@ export class OrdersController {
       street,
       contactPerson,
       contactPersonContact,
+      discount,
       products,
       services,
       additionalCosts
@@ -100,6 +108,21 @@ export class OrdersController {
       return next({ code: ResponseCode.INVALID_INPUT })
     }
 
+    const numericDiscount =
+      typeof discount === 'number'
+        ? discount
+        : discount
+        ? Number(discount)
+        : null
+
+    if (
+      typeof discount !== 'undefined' &&
+      discount !== null &&
+      (typeof numericDiscount !== 'number' || Number.isNaN(numericDiscount))
+    ) {
+      return next({ code: ResponseCode.INVALID_INPUT })
+    }
+
     const { order, code } = await this.ordersService.createOrder({
       totalAmount: numericAmount,
       notes,
@@ -111,6 +134,7 @@ export class OrdersController {
       street,
       contactPerson,
       contactPersonContact,
+      discount: numericDiscount,
       products,
       services,
       additionalCosts
@@ -138,6 +162,7 @@ export class OrdersController {
       street,
       contactPerson,
       contactPersonContact,
+      discount,
       products,
       services,
       additionalCosts
@@ -148,6 +173,15 @@ export class OrdersController {
         ? totalAmount
         : totalAmount
         ? Number(totalAmount)
+        : undefined
+
+    const numericDiscount =
+      typeof discount === 'number'
+        ? discount
+        : discount === null
+        ? null
+        : discount !== undefined
+        ? Number(discount)
         : undefined
 
     if (
@@ -163,9 +197,18 @@ export class OrdersController {
         typeof street === 'undefined' &&
         typeof contactPerson === 'undefined' &&
         typeof contactPersonContact === 'undefined' &&
+        typeof discount === 'undefined' &&
         typeof products === 'undefined' &&
         typeof services === 'undefined' &&
         typeof additionalCosts === 'undefined')
+    ) {
+      return next({ code: ResponseCode.INVALID_INPUT })
+    }
+
+    if (
+      typeof discount !== 'undefined' &&
+      discount !== null &&
+      (typeof numericDiscount !== 'number' || Number.isNaN(numericDiscount))
     ) {
       return next({ code: ResponseCode.INVALID_INPUT })
     }
@@ -183,6 +226,7 @@ export class OrdersController {
       street,
       contactPerson,
       contactPersonContact,
+      discount: numericDiscount,
       products,
       services,
       additionalCosts

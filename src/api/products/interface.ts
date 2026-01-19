@@ -83,6 +83,8 @@ export interface IDeleteProduct extends IServiceMethod {
 
 export interface IGetProductById extends IServiceMethod {
   productId: string
+  userId?: string
+  isClient?: boolean
 }
 
 export interface IListProducts extends IServiceMethod {
