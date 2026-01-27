@@ -64,6 +64,7 @@ export class OrdersService implements IOrderService {
   }
 
   private async generateOrderNumber(
+    acquisitionType: AcquisitionType = AcquisitionType.BUY,
     manager = AppDataSource.manager
   ): Promise<string> {
     const now = new Date()
@@ -74,9 +75,9 @@ export class OrdersService implements IOrderService {
     const orderRepository = manager.getRepository(Order)
     const totalOrders = await orderRepository.count()
     const sequentialNumber = totalOrders + 1
-    const sequentialNumberStr = sequentialNumber.toString().padStart(7, '0')
+    const sequentialNumberStr = sequentialNumber.toString().padStart(6, '0')
 
-    return `qc-${datePrefix}${sequentialNumberStr}`
+    return `qc-${acquisitionType}-${datePrefix}${sequentialNumberStr}`
   }
 
   listOrders = async ({
@@ -391,7 +392,10 @@ export class OrdersService implements IOrderService {
       const additionalCostRepository = manager.getRepository(AdditionalCost)
 
       // Generate order number automatically
-      const orderNumber = await this.generateOrderNumber(manager)
+      const orderNumber = await this.generateOrderNumber(
+        acquisitionType ?? AcquisitionType.BUY,
+        manager
+      )
 
       const order = orderRepository.create({
         orderNumber,
