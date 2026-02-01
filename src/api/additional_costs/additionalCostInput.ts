@@ -17,18 +17,19 @@ const baseAdditionalCostBody = {
   acquisitionType: Joi.string()
     .valid(AcquisitionType.BUY, AcquisitionType.RENT)
     .optional(),
-  price: Joi.number().precision(4).positive(),
+  price: Joi.number().precision(4).min(0),
   calculationStatus: Joi.string()
     .valid(
       ProductStateStatus.AVAILABLE,
       ProductStateStatus.IN_USE,
       ProductStateStatus.MAINTENANCE,
       ProductStateStatus.RESERVED,
-      ProductStateStatus.DAMAGED,
-      ProductStateStatus.OWNED_BY_CLIENT
+      ProductStateStatus.DAMAGED
     )
     .allow(null)
-    .optional()
+    .optional(),
+  maxPieces: Joi.number().integer().min(0).allow(null).optional(),
+  enableUpload: Joi.boolean().optional()
 }
 
 export const listAdditionalCostsSchema = (req: Request) => {
@@ -104,7 +105,9 @@ export const createAdditionalCostSchema = (req: Request) => {
       billingType: req.body.billingType,
       acquisitionType: req.body.acquisitionType,
       price: req.body.price,
-      calculationStatus: req.body.calculationStatus
+      calculationStatus: req.body.calculationStatus,
+      maxPieces: req.body.maxPieces,
+      enableUpload: req.body.enableUpload
     }
   }
 }
@@ -125,7 +128,9 @@ export const updateAdditionalCostSchema = (req: Request) => {
       billingType: req.body.billingType,
       acquisitionType: req.body.acquisitionType,
       price: req.body.price,
-      calculationStatus: req.body.calculationStatus
+      calculationStatus: req.body.calculationStatus,
+      maxPieces: req.body.maxPieces,
+      enableUpload: req.body.enableUpload
     }
   }
 }

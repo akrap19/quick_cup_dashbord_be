@@ -19,7 +19,7 @@ const paths = {
     post: {
       tags: ['Products'],
       description:
-        'Create a new product. Can optionally include service prices for the product.',
+        'Create a new product. Can optionally include service prices and a design template for the product.',
       requestBody: {
         content: {
           'application/json': {
@@ -36,11 +36,129 @@ const paths = {
       }
     }
   },
+  '/products/my-products': {
+    get: {
+      tags: ['Products'],
+      description:
+        "Get all products owned by the currently logged-in client user. Returns products where ownedBy field matches the user ID. Only accessible to users with CLIENT role. Optionally, you can provide a userid query parameter to override the logged-in user's ID and get products for a specific user.",
+      security: [
+        {
+          bearerAuth: []
+        }
+      ],
+      parameters: [
+        {
+          in: 'query',
+          name: 'page',
+          type: 'integer',
+          minimum: 1,
+          required: false,
+          description: 'Page number for pagination'
+        },
+        {
+          in: 'query',
+          name: 'limit',
+          type: 'integer',
+          minimum: 1,
+          maximum: 100,
+          required: false,
+          description: 'Number of items per page'
+        },
+        {
+          in: 'query',
+          name: 'search',
+          type: 'string',
+          required: false,
+          description: 'Search term to filter products by name'
+        },
+        {
+          in: 'query',
+          name: 'userid',
+          type: 'string',
+          format: 'uuid',
+          required: false,
+          description:
+            "Optional user ID to override the logged-in user's ID. If provided, returns products owned by this user instead of the authenticated user."
+        }
+      ],
+      responses: {
+        '200': {
+          description: 'Successfully retrieved products owned by the client',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  data: {
+                    type: 'object',
+                    properties: {
+                      products: {
+                        type: 'array',
+                        items: {
+                          $ref: '#/definitions/product'
+                        }
+                      },
+                      pagination: {
+                        type: 'object',
+                        properties: {
+                          count: {
+                            type: 'integer',
+                            description:
+                              'Total number of unique products owned by the client'
+                          },
+                          page: {
+                            type: 'integer',
+                            description: 'Current page number'
+                          },
+                          limit: {
+                            type: 'integer',
+                            description: 'Number of items per page'
+                          }
+                        }
+                      }
+                    }
+                  },
+                  code: {
+                    type: 'integer',
+                    example: 200000
+                  },
+                  message: {
+                    type: 'string',
+                    example: 'OK'
+                  }
+                }
+              }
+            }
+          }
+        },
+        '401': {
+          description: 'Unauthorized - User not authenticated',
+          content: {
+            'application/json': {
+              schema: {
+                $ref: '#/definitions/user_not_found_response'
+              }
+            }
+          }
+        },
+        '403': {
+          description: 'Forbidden - Client role required',
+          content: {
+            'application/json': {
+              schema: {
+                $ref: '#/definitions/user_not_found_response'
+              }
+            }
+          }
+        }
+      }
+    }
+  },
   '/products/{productId}': {
     get: {
       tags: ['Products'],
       description:
-        'Get product details with images, prices, and service prices',
+        'Get product details with images, prices, service prices, and design template',
       parameters: [
         {
           in: 'path',
@@ -52,7 +170,7 @@ const paths = {
       responses: {
         '200': {
           description:
-            'Successfully retrieved product with images, prices, and service prices'
+            'Successfully retrieved product with images, prices, service prices, and design template'
         },
         '404': {
           description: 'Product not found'
@@ -62,7 +180,7 @@ const paths = {
     put: {
       tags: ['Products'],
       description:
-        'Update product and manage images, prices, and service prices. Prices are provided as a complete array (like in create), and the system will automatically add new prices, remove prices that no longer match, and keep matching prices. Service prices can optionally be updated (replaces all existing service prices).',
+        'Update product and manage images, prices, service prices, and design template. Prices are provided as a complete array (like in create), and the system will automatically add new prices, remove prices that no longer match, and keep matching prices. Service prices can optionally be updated (replaces all existing service prices). Design template can be updated or removed by setting designTemplateId to null.',
       parameters: [
         {
           in: 'path',
@@ -100,6 +218,59 @@ const paths = {
       responses: {
         '204': {
           description: 'Successfully deleted product'
+        }
+      }
+    }
+  },
+  '/products/{productId}/design-template': {
+    get: {
+      tags: ['Products'],
+      description:
+        'Download the design template file for a product. Available to all authenticated users.',
+      parameters: [
+        {
+          in: 'path',
+          name: 'productId',
+          type: 'string',
+          required: true,
+          description: 'Product ID'
+        }
+      ],
+      responses: {
+        '200': {
+          description: 'Successfully downloaded design template file',
+          content: {
+            'application/octet-stream': {
+              schema: {
+                type: 'string',
+                format: 'binary'
+              }
+            }
+          },
+          headers: {
+            'Content-Type': {
+              schema: {
+                type: 'string'
+              },
+              description: 'MIME type of the file'
+            },
+            'Content-Disposition': {
+              schema: {
+                type: 'string'
+              },
+              description: 'Attachment filename'
+            }
+          }
+        },
+        '404': {
+          description: 'Product not found or design template not available',
+          content: {
+            'application/json': {
+              schema: {
+                $ref: '#/definitions/user_not_found_response'
+              }
+            }
+          }
         }
       }
     }
@@ -230,7 +401,8 @@ const paths = {
       },
       responses: {
         '200': {
-          description: 'Bulk update completed. Check individual product results for success/failure status.',
+          description:
+            'Bulk update completed. Check individual product results for success/failure status.',
           content: {
             'application/json': {
               schema: {
@@ -315,6 +487,13 @@ const definitions = {
         },
         description:
           'Array of media/image IDs to associate with the product. Images must be uploaded first using the /media endpoint.'
+      },
+      designTemplateId: {
+        type: 'string',
+        format: 'uuid',
+        nullable: true,
+        description:
+          'Media ID of the design template file. The template must be uploaded first using the /media endpoint. Set to null to remove the design template.'
       },
       prices: {
         type: 'array',
@@ -448,6 +627,7 @@ const definitions = {
         '123e4567-e89b-12d3-a456-426614174000',
         '123e4567-e89b-12d3-a456-426614174001'
       ],
+      designTemplateId: '123e4567-e89b-12d3-a456-426614174002',
       prices: [
         {
           minQuantity: 1,
@@ -556,6 +736,13 @@ const definitions = {
           format: 'uuid'
         },
         description: 'Array of media/image IDs to remove from the product.'
+      },
+      designTemplateId: {
+        type: 'string',
+        format: 'uuid',
+        nullable: true,
+        description:
+          'Media ID of the design template file. The template must be uploaded first using the /media endpoint. Set to null to remove the design template.'
       },
       prices: {
         type: 'array',
@@ -690,6 +877,7 @@ const definitions = {
         '123e4567-e89b-12d3-a456-426614174001'
       ],
       imageIdsToRemove: ['123e4567-e89b-12d3-a456-426614174002'],
+      designTemplateId: '123e4567-e89b-12d3-a456-426614174003',
       prices: [
         {
           minQuantity: 1,

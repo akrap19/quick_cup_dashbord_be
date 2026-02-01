@@ -65,6 +65,44 @@ export class ProductsController {
     return next({ data: product, code })
   }
 
+  getMyProducts = async (req: Request, res: Response, next: NextFunction) => {
+    const input = res.locals.input ?? {}
+    const { page, limit, search, userid } = input
+
+    // Use userid from query parameter if provided, otherwise use logged-in user's ID
+    let userId = userid
+    if (!userId) {
+      userId = req.user?.id
+      if (!userId) {
+        return next({ code: ResponseCode.UNAUTHORIZED })
+      }
+    }
+
+    const pageNumber = typeof page === 'number' ? page : undefined
+    const limitNumber = typeof limit === 'number' ? limit : undefined
+    const searchTerm = typeof search === 'string' ? search : null
+
+    const { products, pagination, code } =
+      await this.productsService.getMyProducts({
+        userId,
+        page: pageNumber,
+        limit: limitNumber,
+        search: searchTerm
+      })
+
+    if (!products || !pagination) {
+      return next({ code })
+    }
+
+    return next({
+      data: {
+        products,
+        pagination
+      },
+      code
+    })
+  }
+
   createProduct = async (req: Request, res: Response, next: NextFunction) => {
     const input = res.locals.input ?? {}
     const {
@@ -77,6 +115,7 @@ export class ProductsController {
       description,
       acquisitionType,
       imageIds,
+      designTemplateId,
       prices,
       servicePrices,
       productStates
@@ -92,6 +131,7 @@ export class ProductsController {
       description,
       acquisitionType,
       imageIds,
+      designTemplateId,
       prices,
       servicePrices,
       productStates
@@ -118,6 +158,7 @@ export class ProductsController {
       acquisitionType,
       imageIdsToAdd,
       imageIdsToRemove,
+      designTemplateId,
       prices,
       servicePrices,
       productStates
@@ -135,6 +176,7 @@ export class ProductsController {
       acquisitionType,
       imageIdsToAdd,
       imageIdsToRemove,
+      designTemplateId,
       prices,
       servicePrices,
       productStates
@@ -216,15 +258,51 @@ export class ProductsController {
     const input = res.locals.input ?? {}
     const { updates } = input
 
-    const { data, code } =
-      await this.productsService.bulkUpdateProductStates({
-        updates
-      })
+    const { data, code } = await this.productsService.bulkUpdateProductStates({
+      updates
+    })
 
     if (!data) {
       return next({ code })
     }
 
     return next({ data, code })
+  }
+
+  downloadDesignTemplate = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const input = res.locals.input ?? {}
+    const { productId } = input
+
+    const result = await this.productsService.downloadDesignTemplate({
+      productId
+    })
+
+    if (!result.data) {
+      return next({ code: result.code })
+    }
+
+    // Type guard: check if data has the expected structure
+    const fileData = result.data as {
+      buffer: Buffer
+      fileName: string
+      mimeType: string
+    }
+    if (!fileData.buffer || !fileData.fileName || !fileData.mimeType) {
+      return next({ code: result.code })
+    }
+
+    const { buffer, fileName, mimeType } = fileData
+
+    // Set headers for file download
+    res.setHeader('Content-Type', mimeType)
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`)
+    res.setHeader('Content-Length', buffer.length.toString())
+
+    // Send the file buffer
+    res.send(buffer)
   }
 }

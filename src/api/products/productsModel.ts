@@ -4,12 +4,15 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  OneToMany
+  OneToMany,
+  ManyToOne,
+  JoinColumn
 } from 'typeorm'
 import { AcquisitionType, ProductStatus } from './interface'
 import { ProductMedia } from './productsMediaModel'
 import { ProductPrice } from './productPriceModel'
 import { ProductState } from '../product_state/productStateModel'
+import { Media } from '../media/mediaModel'
 
 @Entity()
 export class Product {
@@ -59,6 +62,26 @@ export class Product {
 
   @OneToMany(() => ProductState, (productState) => productState.product)
   productStates?: ProductState[]
+
+  @Column({
+    name: 'design_template_id',
+    type: 'varchar',
+    length: 36,
+    nullable: true
+  })
+  designTemplateId?: string | null
+
+  @ManyToOne(() => Media, { nullable: true })
+  @JoinColumn({ name: 'design_template_id' })
+  designTemplate?: Media | null
+
+  @Column({
+    name: 'owned_by',
+    type: 'varchar',
+    length: 36,
+    nullable: true
+  })
+  ownedBy?: string | null
 
   @CreateDateColumn({
     type: 'timestamp',

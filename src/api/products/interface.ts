@@ -21,6 +21,7 @@ export interface ICreateProduct extends IServiceMethod {
   description?: string | null
   acquisitionType: AcquisitionType
   imageIds?: string[]
+  designTemplateId?: string | null
   prices?: Array<{
     minQuantity: number
     maxQuantity?: number | null
@@ -55,6 +56,7 @@ export interface IUpdateProduct extends IServiceMethod {
   acquisitionType?: AcquisitionType
   imageIdsToAdd?: string[]
   imageIdsToRemove?: string[]
+  designTemplateId?: string | null
   prices?: Array<{
     minQuantity: number
     maxQuantity?: number | null
@@ -92,6 +94,13 @@ export interface IListProducts extends IServiceMethod {
   page?: number
   limit?: number
   acquisitionType?: AcquisitionType
+}
+
+export interface IGetMyProducts extends IServiceMethod {
+  userId: string
+  page?: number
+  limit?: number
+  search?: string | null
 }
 
 export interface IProductsPagination {
@@ -178,6 +187,7 @@ export interface IBulkUpdateProductStatesResult {
 export interface IProductService {
   listProducts(params: IListProducts): AsyncResponse<IProductsPagination>
   getProductById(params: IGetProductById): AsyncResponse<Product>
+  getMyProducts(params: IGetMyProducts): AsyncResponse<IProductsPagination>
   createProduct(params: ICreateProduct): AsyncResponse<Product>
   updateProduct(params: IUpdateProduct): AsyncResponse<Product>
   deleteProduct(params: IDeleteProduct): AsyncResponse<null>
@@ -193,4 +203,7 @@ export interface IProductService {
   bulkUpdateProductStates(
     params: IBulkUpdateProductStates
   ): AsyncResponse<IBulkUpdateProductStatesResult>
+  downloadDesignTemplate(params: {
+    productId: string
+  }): AsyncResponse<{ buffer: Buffer; fileName: string; mimeType: string }>
 }

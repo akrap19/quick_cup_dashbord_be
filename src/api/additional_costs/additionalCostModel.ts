@@ -55,6 +55,20 @@ export class AdditionalCost {
   })
   calculationStatus?: ProductStateStatus | null
 
+  @Column({
+    name: 'max_pieces',
+    type: 'int',
+    nullable: true
+  })
+  maxPieces?: number | null
+
+  @Column({
+    name: 'enable_upload',
+    type: 'boolean',
+    default: false
+  })
+  enableUpload!: boolean
+
   @CreateDateColumn({
     name: 'created_at',
     type: 'timestamp',
@@ -76,7 +90,9 @@ export class AdditionalCost {
     billingType: BillingType,
     acquisitionType: AcquisitionType,
     price: number,
-    calculationStatus?: ProductStateStatus | null
+    calculationStatus?: ProductStateStatus | null,
+    maxPieces?: number | null,
+    enableUpload?: boolean
   ) {
     this.name = name
     this.methodOfPayment = methodOfPayment
@@ -84,5 +100,7 @@ export class AdditionalCost {
     this.acquisitionType = acquisitionType
     this.price = price
     this.calculationStatus = calculationStatus ?? null
+    this.maxPieces = maxPieces ?? null
+    this.enableUpload = enableUpload ?? false
   }
 }

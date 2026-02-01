@@ -107,7 +107,9 @@ export class AdditionalCostsController {
       billingType,
       acquisitionType,
       price,
-      calculationStatus
+      calculationStatus,
+      maxPieces,
+      enableUpload
     } = input
 
     const numericPrice =
@@ -127,6 +129,32 @@ export class AdditionalCostsController {
         ? null
         : undefined
 
+    const numericMaxPieces =
+      typeof maxPieces === 'number'
+        ? maxPieces
+        : maxPieces === null
+        ? null
+        : maxPieces !== undefined
+        ? Number(maxPieces)
+        : undefined
+
+    if (
+      typeof numericMaxPieces !== 'undefined' &&
+      numericMaxPieces !== null &&
+      (typeof numericMaxPieces !== 'number' ||
+        Number.isNaN(numericMaxPieces) ||
+        numericMaxPieces < 0)
+    ) {
+      return next({ code: ResponseCode.INVALID_INPUT })
+    }
+
+    const booleanEnableUpload =
+      typeof enableUpload === 'boolean'
+        ? enableUpload
+        : enableUpload !== undefined
+        ? Boolean(enableUpload)
+        : false
+
     const { additionalCost, code } =
       await this.additionalCostsService.createAdditionalCost({
         name,
@@ -134,7 +162,10 @@ export class AdditionalCostsController {
         billingType,
         acquisitionType,
         price: numericPrice,
-        calculationStatus: calculationStatusFilter
+        calculationStatus: calculationStatusFilter,
+        maxPieces:
+          typeof numericMaxPieces === 'undefined' ? undefined : numericMaxPieces,
+        enableUpload: booleanEnableUpload
       })
 
     if (!additionalCost) {
@@ -157,7 +188,9 @@ export class AdditionalCostsController {
       billingType,
       acquisitionType,
       price,
-      calculationStatus
+      calculationStatus,
+      maxPieces,
+      enableUpload
     } = input
 
     if (typeof additionalCostId !== 'string') {
@@ -184,6 +217,32 @@ export class AdditionalCostsController {
         ? null
         : undefined
 
+    const numericMaxPieces =
+      typeof maxPieces === 'number'
+        ? maxPieces
+        : maxPieces === null
+        ? null
+        : maxPieces !== undefined
+        ? Number(maxPieces)
+        : undefined
+
+    if (
+      typeof numericMaxPieces !== 'undefined' &&
+      numericMaxPieces !== null &&
+      (typeof numericMaxPieces !== 'number' ||
+        Number.isNaN(numericMaxPieces) ||
+        numericMaxPieces < 0)
+    ) {
+      return next({ code: ResponseCode.INVALID_INPUT })
+    }
+
+    const booleanEnableUpload =
+      typeof enableUpload === 'boolean'
+        ? enableUpload
+        : enableUpload !== undefined
+        ? Boolean(enableUpload)
+        : undefined
+
     const { additionalCost, code } =
       await this.additionalCostsService.updateAdditionalCost({
         additionalCostId,
@@ -192,7 +251,10 @@ export class AdditionalCostsController {
         billingType,
         acquisitionType,
         price: numericPrice,
-        calculationStatus: calculationStatusFilter
+        calculationStatus: calculationStatusFilter,
+        maxPieces:
+          typeof numericMaxPieces === 'undefined' ? undefined : numericMaxPieces,
+        enableUpload: booleanEnableUpload
       })
 
     if (!additionalCost) {

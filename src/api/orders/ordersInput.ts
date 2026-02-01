@@ -7,7 +7,7 @@ const uuidSchema = Joi.string().guid({ version: 'uuidv4' })
 const orderProductSchema = Joi.object({
   productId: uuidSchema.required(),
   quantity: Joi.number().integer().min(1).required(),
-  price: Joi.number().precision(4).positive().required()
+  price: Joi.number().precision(4).positive().optional()
 })
 
 const orderServiceProductSchema = Joi.object({
@@ -18,19 +18,20 @@ const orderServiceProductSchema = Joi.object({
 const orderServiceSchema = Joi.object({
   serviceId: uuidSchema.required(),
   quantity: Joi.number().integer().min(1).required(),
-  price: Joi.number().precision(4).positive().required(),
+  price: Joi.number().precision(4).positive().optional(),
   serviceLocationId: uuidSchema.allow(null).optional(),
   quantityByProduct: Joi.array().items(orderServiceProductSchema).optional()
 })
 
 const orderAdditionalCostProductSchema = Joi.object({
   productId: uuidSchema.required(),
-  quantity: Joi.number().integer().min(0).required()
+  quantity: Joi.number().integer().min(0).required(),
+  fileId: uuidSchema.allow(null).optional()
 })
 
 const orderAdditionalCostSchema = Joi.object({
   additionalCostId: uuidSchema.required(),
-  price: Joi.number().precision(4).positive().required(),
+  price: Joi.number().precision(4).positive().optional(),
   quantity: Joi.number().integer().min(1).allow(null).optional(),
   quantityByProduct: Joi.array()
     .items(orderAdditionalCostProductSchema)
@@ -94,7 +95,7 @@ export const createOrderSchema = (req: Request) => {
     schema: Joi.object()
       .keys({
         ...baseOrderBody,
-        totalAmount: baseOrderBody.totalAmount.required()
+        totalAmount: baseOrderBody.totalAmount.optional()
       })
       .options({ abortEarly: false }),
     input: {

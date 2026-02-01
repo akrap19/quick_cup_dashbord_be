@@ -213,6 +213,8 @@ const definitions = {
         ],
         nullable: true
       },
+      maxPieces: { type: 'integer', minimum: 0, nullable: true },
+      enableUpload: { type: 'boolean' },
       createdAt: { type: 'string', format: 'date-time' },
       updatedAt: { type: 'string', format: 'date-time' }
     },
@@ -255,7 +257,9 @@ const definitions = {
           'owned_by_client'
         ],
         nullable: true
-      }
+      },
+      maxPieces: { type: 'integer', minimum: 0, nullable: true },
+      enableUpload: { type: 'boolean' }
     },
     required: [
       'name',
@@ -293,7 +297,9 @@ const definitions = {
           'owned_by_client'
         ],
         nullable: true
-      }
+      },
+      maxPieces: { type: 'integer', minimum: 0, nullable: true },
+      enableUpload: { type: 'boolean' }
     }
   },
   additional_cost_response: {

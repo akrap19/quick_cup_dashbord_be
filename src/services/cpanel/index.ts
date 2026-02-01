@@ -159,3 +159,65 @@ export const getFileURL = async (
     return null
   }
 }
+
+/**
+ * Downloads a file from cPanel via SFTP and returns it as a buffer
+ * @param remotePath - Full remote path of the file to download (e.g., 'uploads/image/file.jpg')
+ * @returns The file buffer, or null if download failed
+ */
+export const downloadFile = async (
+  remotePath: string
+): Promise<Buffer | null> => {
+  const sftp = new Client()
+
+  try {
+    // Validate SFTP configuration
+    if (!config.SFTP_HOST || !config.SFTP_USERNAME || !config.SFTP_PASSWORD) {
+      throw new Error(
+        'SFTP configuration is missing. Please set SFTP_HOST, SFTP_USERNAME, and SFTP_PASSWORD'
+      )
+    }
+
+    // Connect to SFTP server
+    await sftp.connect({
+      host: config.SFTP_HOST,
+      port: config.SFTP_PORT,
+      username: config.SFTP_USERNAME,
+      password: config.SFTP_PASSWORD,
+      readyTimeout: 30000
+    })
+
+    // Download the file
+    const fileData = await sftp.get(remotePath)
+
+    // Close the connection
+    await sftp.end()
+
+    // Ensure we return a Buffer
+    if (Buffer.isBuffer(fileData)) {
+      return fileData
+    } else if (typeof fileData === 'string') {
+      return Buffer.from(fileData, 'utf-8')
+    } else {
+      // If it's a stream, we need to convert it to a buffer
+      // This shouldn't happen with default sftp.get() behavior, but handle it just in case
+      throw new Error('Unexpected file data type from SFTP')
+    }
+  } catch (err: any) {
+    logger.error({
+      code: ResponseCode.FAILED_DEPENDENCY,
+      message: ResponseMessage.FAILED_DEPENDENCY,
+      stack: err.stack,
+      details: `SFTP download failed: ${err.message}`
+    })
+
+    // Make sure to close the connection on error
+    try {
+      await sftp.end()
+    } catch (closeErr) {
+      // Ignore close errors
+    }
+
+    return null
+  }
+}

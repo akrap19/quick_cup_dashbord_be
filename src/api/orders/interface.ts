@@ -24,6 +24,7 @@ export interface IOrderServiceInput {
 export interface IOrderAdditionalCostProductInput {
   productId: string
   quantity: number
+  fileId?: string | null
 }
 
 export interface IOrderAdditionalCostInput {

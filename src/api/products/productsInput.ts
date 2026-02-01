@@ -119,12 +119,45 @@ export const listProductsSchema = (req: Request) => {
   }
 }
 
+export const getMyProductsSchema = (req: Request) => {
+  const rawSearch = req.query.search
+  const rawPage = req.query.page
+  const rawLimit = req.query.limit
+  const rawUserId = req.query.userid
+
+  return {
+    schema: Joi.object()
+      .keys({
+        search: Joi.string().allow('', null).optional(),
+        page: Joi.number().min(1).optional(),
+        limit: Joi.number().min(1).max(100).optional(),
+        userid: uuidSchema.optional()
+      })
+      .options({ abortEarly: false }),
+    input: {
+      search: Array.isArray(rawSearch)
+        ? rawSearch[0]
+        : rawSearch === undefined
+        ? null
+        : rawSearch,
+      page: Array.isArray(rawPage) ? rawPage[0] : rawPage,
+      limit: Array.isArray(rawLimit) ? rawLimit[0] : rawLimit,
+      userid: Array.isArray(rawUserId)
+        ? rawUserId[0]
+        : rawUserId === undefined
+        ? undefined
+        : rawUserId
+    }
+  }
+}
+
 export const createProductSchema = (req: Request) => {
   return {
     schema: Joi.object()
       .keys({
         ...baseProductBody,
         imageIds: Joi.array().items(uuidSchema).optional(),
+        designTemplateId: uuidSchema.allow(null).optional(),
         prices: Joi.array().items(priceTierSchema).optional(),
         servicePrices: Joi.array()
           .items(
@@ -149,6 +182,12 @@ export const createProductSchema = (req: Request) => {
       imageIds: Array.isArray(req.body.imageIds)
         ? req.body.imageIds
         : undefined,
+      designTemplateId:
+        req.body.designTemplateId === null
+          ? null
+          : req.body.designTemplateId
+          ? req.body.designTemplateId
+          : undefined,
       prices: Array.isArray(req.body.prices) ? req.body.prices : undefined,
       servicePrices: Array.isArray(req.body.servicePrices)
         ? req.body.servicePrices
@@ -168,6 +207,7 @@ export const updateProductSchema = (req: Request) => {
         ...baseProductBody,
         imageIdsToAdd: Joi.array().items(uuidSchema).optional(),
         imageIdsToRemove: Joi.array().items(uuidSchema).optional(),
+        designTemplateId: uuidSchema.allow(null).optional(),
         prices: Joi.array().items(priceTierSchema).optional(),
         servicePrices: Joi.array()
           .items(
@@ -197,6 +237,12 @@ export const updateProductSchema = (req: Request) => {
       imageIdsToRemove: Array.isArray(req.body.imageIdsToRemove)
         ? req.body.imageIdsToRemove
         : undefined,
+      designTemplateId:
+        req.body.designTemplateId === null
+          ? null
+          : req.body.designTemplateId
+          ? req.body.designTemplateId
+          : undefined,
       prices: Array.isArray(req.body.prices) ? req.body.prices : undefined,
       servicePrices: Array.isArray(req.body.servicePrices)
         ? req.body.servicePrices

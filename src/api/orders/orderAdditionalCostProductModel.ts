@@ -10,6 +10,7 @@ import {
 } from 'typeorm'
 import { OrderAdditionalCost } from './orderAdditionalCostModel'
 import { Product } from '../products/productsModel'
+import { Media } from '../media/mediaModel'
 
 @Entity('order_additional_cost_product')
 @Index(['orderAdditionalCostId', 'productId'])
@@ -34,6 +35,13 @@ export class OrderAdditionalCostProduct {
   @Column({ type: 'int' })
   quantity!: number
 
+  @Column({ name: 'media_id', nullable: true })
+  mediaId?: string | null
+
+  @ManyToOne(() => Media, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'media_id' })
+  media?: Media | null
+
   @CreateDateColumn({
     type: 'timestamp',
     default: () => 'CURRENT_TIMESTAMP(6)'
@@ -50,10 +58,12 @@ export class OrderAdditionalCostProduct {
   constructor(
     orderAdditionalCostId: string,
     productId: string,
-    quantity: number
+    quantity: number,
+    mediaId?: string | null
   ) {
     this.orderAdditionalCostId = orderAdditionalCostId
     this.productId = productId
     this.quantity = quantity
+    this.mediaId = mediaId ?? null
   }
 }

@@ -11,6 +11,7 @@ import {
   createProductSchema,
   getAllProductPricesSchema,
   getAllProductServicePricesSchema,
+  getMyProductsSchema,
   listProductsSchema,
   productIdParamSchema,
   updateProductSchema
@@ -31,11 +32,26 @@ productsRouter.get(
 )
 
 productsRouter.get(
+  '/my-products',
+  requireToken,
+  requireRole([RoleType.CLIENT]),
+  validate(getMyProductsSchema),
+  productsController.getMyProducts
+)
+
+productsRouter.get(
   '/prices',
   requireToken,
   requireRole(adminRoles),
   validate(getAllProductPricesSchema),
   productsController.getAllProductPrices
+)
+
+productsRouter.get(
+  '/:productId/design-template',
+  requireToken,
+  validate(productIdParamSchema),
+  productsController.downloadDesignTemplate
 )
 
 productsRouter.get(

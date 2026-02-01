@@ -9,7 +9,7 @@ const paths = {
   '/media': {
     post: {
       tags: ['Media'],
-      description: 'Upload media\n- type can be Image, Audio, or Video',
+      description: 'Upload media\n- type can be Image, Audio, Video, or File',
       parameters: [
         {
           in: 'query',
@@ -115,6 +115,69 @@ const paths = {
         }
       }
     }
+  },
+  '/media/{mediaId}/download': {
+    get: {
+      tags: ['Media'],
+      description:
+        'Download a media file by its ID. Available to all authenticated users. This is a general endpoint that allows any file to be downloaded through it.',
+      parameters: [
+        {
+          in: 'path',
+          name: 'mediaId',
+          type: 'string',
+          required: true,
+          description: 'Media ID'
+        }
+      ],
+      responses: {
+        '200': {
+          description: 'Successfully downloaded media file',
+          content: {
+            'application/octet-stream': {
+              schema: {
+                type: 'string',
+                format: 'binary'
+              }
+            }
+          },
+          headers: {
+            'Content-Type': {
+              schema: {
+                type: 'string'
+              },
+              description: 'MIME type of the file'
+            },
+            'Content-Disposition': {
+              schema: {
+                type: 'string'
+              },
+              description: 'Attachment filename'
+            }
+          }
+        },
+        '404': {
+          description: 'Media not found',
+          content: {
+            'application/json': {
+              schema: {
+                $ref: '#/definitions/media_not_found_response'
+              }
+            }
+          }
+        },
+        '424': {
+          description: 'Failed to download file',
+          content: {
+            'application/json': {
+              schema: {
+                $ref: '#/definitions/failed_dependency_response'
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }
 
@@ -154,6 +217,20 @@ const definitions = {
   delete_media_body: {
     example: {
       mediaId: '83d0de32-41a0-4474-b93b-78c8e96e31a6'
+    }
+  },
+  media_not_found_response: {
+    example: {
+      data: null,
+      code: 404013,
+      message: 'Media not found'
+    }
+  },
+  failed_dependency_response: {
+    example: {
+      data: null,
+      code: 424000,
+      message: 'Failed dependency'
     }
   }
 }

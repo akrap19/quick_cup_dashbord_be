@@ -25,12 +25,18 @@ const paths = {
     },
     post: {
       tags: ['Orders'],
-      description: 'Create a new order',
+      description:
+        'Create a new order. Supports both JSON and multipart/form-data. When using multipart/form-data, files for additional cost products can be uploaded using the naming pattern: additionalCosts[0].quantityByProduct[0].file, additionalCosts[0].quantityByProduct[1].file, etc. Files are only accepted when the additional cost has enableUpload enabled.',
       requestBody: {
         content: {
           'application/json': {
             schema: {
               $ref: '#/definitions/create_order_body'
+            }
+          },
+          'multipart/form-data': {
+            schema: {
+              $ref: '#/definitions/create_order_body_multipart'
             }
           }
         }
@@ -73,7 +79,8 @@ const paths = {
     },
     put: {
       tags: ['Orders'],
-      description: 'Update order',
+      description:
+        'Update order. Supports both JSON and multipart/form-data. When using multipart/form-data, files for additional cost products can be uploaded using the naming pattern: additionalCosts[0].quantityByProduct[0].file, additionalCosts[0].quantityByProduct[1].file, etc. Files are only accepted when the additional cost has enableUpload enabled.',
       parameters: [
         {
           in: 'path',
@@ -87,6 +94,11 @@ const paths = {
           'application/json': {
             schema: {
               $ref: '#/definitions/update_order_body'
+            }
+          },
+          'multipart/form-data': {
+            schema: {
+              $ref: '#/definitions/update_order_body_multipart'
             }
           }
         }
@@ -166,7 +178,8 @@ const definitions = {
         {
           productId: 'uuid-here',
           quantity: 2,
-          price: 25.99
+          price: 25.99,
+          fileId: 'uuid-here' // Optional: file ID if file was pre-uploaded via media endpoint. Only used when an additional cost has enableUpload = true
         }
       ],
       services: [
@@ -192,13 +205,26 @@ const definitions = {
         {
           additionalCostId: 'uuid-here',
           price: 10.5,
-          quantity: 2
-          // Note: quantityByProduct is NOT available in POST, only quantity is needed initially
+          quantity: 2,
+          quantityByProduct: [
+            // Optional: breakdown of product quantities within this additional cost
+            // Only used when additionalCost.methodOfPayment is 'after' OR enableUpload is true
+            {
+              productId: '49fde29b-5273-42fd-9475-a199d9bbf013',
+              quantity: 500,
+              fileId: 'uuid-here' // Optional: file ID if file was pre-uploaded via media endpoint
+            },
+            {
+              productId: '3ebb80fe-fe2a-43f1-82a0-7d6ae2cf06f6',
+              quantity: 500
+              // When using multipart/form-data, upload file as: additionalCosts[0].quantityByProduct[1].file
+            }
+          ]
         }
       ]
     },
     description:
-      'Order number is automatically generated in format: qc-ddmmyy0000001. Each service in the services array can optionally include a serviceLocationId to allocate the service to a specific service location, and quantityByProduct array to specify how many of each product are included in the service. Note: quantityByProduct for additionalCosts is NOT available in POST - only quantity is needed initially. Use PUT to add quantityByProduct breakdown for additional costs with methodOfPayment = "after".'
+      'Order number is automatically generated in format: qc-ddmmyy0000001. Each service in the services array can optionally include a serviceLocationId to allocate the service to a specific service location, and quantityByProduct array to specify how many of each product are included in the service. For additionalCosts, quantityByProduct is optional and used when the additionalCost.methodOfPayment is "after" OR enableUpload is true. When enableUpload is true, files can be uploaded for products in the products array - either by providing fileId (for pre-uploaded files) or by uploading files directly via multipart/form-data using the naming pattern: products[0].file, products[1].file, etc.'
   },
   update_order_body: {
     example: {
@@ -213,7 +239,8 @@ const definitions = {
         {
           productId: 'uuid-here',
           quantity: 3,
-          price: 20.0
+          price: 20.0,
+          fileId: 'uuid-here' // Optional: file ID if file was pre-uploaded via media endpoint. Only used when an additional cost has enableUpload = true
         }
       ],
       services: [
@@ -242,21 +269,23 @@ const definitions = {
           quantity: 1,
           quantityByProduct: [
             // Optional: breakdown of product quantities within this additional cost
-            // Only used when additionalCost.methodOfPayment is 'after'
+            // Only used when additionalCost.methodOfPayment is 'after' OR enableUpload is true
             {
               productId: '49fde29b-5273-42fd-9475-a199d9bbf013',
-              quantity: 500
+              quantity: 500,
+              fileId: 'uuid-here' // Optional: file ID if file was pre-uploaded via media endpoint
             },
             {
               productId: '3ebb80fe-fe2a-43f1-82a0-7d6ae2cf06f6',
               quantity: 500
+              // When using multipart/form-data, upload file as: additionalCosts[0].quantityByProduct[1].file
             }
           ]
         }
       ]
     },
     description:
-      'Each service in the services array can optionally include a serviceLocationId to allocate the service to a specific service location, and quantityByProduct array to specify how many of each product are included in the service. For additionalCosts, quantityByProduct is optional and only used when the additionalCost.methodOfPayment is "after" - it allows you to specify a breakdown of product quantities within the additional cost.'
+      'Each service in the services array can optionally include a serviceLocationId to allocate the service to a specific service location, and quantityByProduct array to specify how many of each product are included in the service. For additionalCosts, quantityByProduct is optional and used when the additionalCost.methodOfPayment is "after" OR enableUpload is true. When enableUpload is true, files can be uploaded for products in the products array - either by providing fileId (for pre-uploaded files) or by uploading files directly via multipart/form-data using the naming pattern: products[0].file, products[1].file, etc.'
   },
   update_order_status_body: {
     example: {
@@ -313,6 +342,7 @@ const definitions = {
                 productId: '77069d61-3f62-4f3f-b8c4-10f3f26b4e51',
                 quantity: 2,
                 price: 25.99,
+                fileId: 'uuid-here', // Present when file was uploaded for this product (only when additional cost has enableUpload = true)
                 createdAt: '2024-01-01T10:00:00.000Z',
                 updatedAt: '2024-01-01T10:00:00.000Z'
               }
@@ -352,7 +382,7 @@ const definitions = {
                 price: 10.5,
                 quantity: 2,
                 quantityByProduct: [
-                  // Only present when additionalCost.methodOfPayment is 'after'
+                  // Only present when additionalCost.methodOfPayment is 'after' OR enableUpload is true
                   {
                     productId: '49fde29b-5273-42fd-9475-a199d9bbf013',
                     quantity: 500
@@ -368,7 +398,8 @@ const definitions = {
                   id: 'cc069d61-3f62-4f3f-b8c4-10f3f26b4e51',
                   name: 'Delivery Fee',
                   billingType: 'by_piece',
-                  methodOfPayment: 'after'
+                  methodOfPayment: 'after',
+                  enableUpload: true // When true, files can be uploaded for products
                 }
               }
             ]
@@ -489,14 +520,17 @@ const definitions = {
             price: 10.5,
             quantity: 2,
             quantityByProduct: [
-              // Only present when additionalCost.methodOfPayment is 'after'
+              // Only present when additionalCost.methodOfPayment is 'after' OR enableUpload is true
+              // When enableUpload is true and file exists: returns fileId and fileUrl (no quantity)
+              // When methodOfPayment is 'after': returns quantity (no file info)
               {
                 productId: '49fde29b-5273-42fd-9475-a199d9bbf013',
-                quantity: 500
+                fileId: 'uuid-here', // Present when enableUpload = true and file was uploaded
+                fileUrl: 'https://example.com/files/file.pdf' // File URL for preview
               },
               {
                 productId: '3ebb80fe-fe2a-43f1-82a0-7d6ae2cf06f6',
-                quantity: 500
+                quantity: 500 // Present when methodOfPayment = 'after' (no file)
               }
             ],
             createdAt: '2024-01-01T10:00:00.000Z',
@@ -505,7 +539,8 @@ const definitions = {
               id: 'cc069d61-3f62-4f3f-b8c4-10f3f26b4e51',
               name: 'Delivery Fee',
               billingType: 'by_piece',
-              methodOfPayment: 'after'
+              methodOfPayment: 'after',
+              enableUpload: true // When true, files can be uploaded for products
             }
           }
         ]
@@ -513,6 +548,73 @@ const definitions = {
       code: 200000,
       message: 'OK'
     }
+  },
+  create_order_body_multipart: {
+    type: 'object',
+    properties: {
+      totalAmount: { type: 'number' },
+      notes: { type: 'string' },
+      acquisitionType: { type: 'string', enum: ['buy', 'rent'] },
+      customerId: { type: 'string' },
+      eventId: { type: 'string' },
+      location: { type: 'string' },
+      place: { type: 'string' },
+      street: { type: 'string' },
+      contactPerson: { type: 'string' },
+      contactPersonContact: { type: 'string' },
+      discount: { type: 'number' },
+      products: { type: 'array' },
+      services: { type: 'array' },
+      additionalCosts: { type: 'array' },
+      'products[0].file': {
+        type: 'string',
+        format: 'binary',
+        description:
+          'File for first product (only when additional cost has enableUpload = true)'
+      },
+      'products[1].file': {
+        type: 'string',
+        format: 'binary',
+        description:
+          'File for second product (only when additional cost has enableUpload = true)'
+      }
+    },
+    description:
+      'Multipart form data version. All fields are the same as JSON version. Files can be uploaded for products when an additional cost has enableUpload = true. File naming pattern: products[productIndex].file'
+  },
+  update_order_body_multipart: {
+    type: 'object',
+    properties: {
+      status: { type: 'string' },
+      totalAmount: { type: 'number' },
+      notes: { type: 'string' },
+      acquisitionType: { type: 'string', enum: ['buy', 'rent'] },
+      customerId: { type: 'string' },
+      eventId: { type: 'string' },
+      location: { type: 'string' },
+      place: { type: 'string' },
+      street: { type: 'string' },
+      contactPerson: { type: 'string' },
+      contactPersonContact: { type: 'string' },
+      discount: { type: 'number' },
+      products: { type: 'array' },
+      services: { type: 'array' },
+      additionalCosts: { type: 'array' },
+      'products[0].file': {
+        type: 'string',
+        format: 'binary',
+        description:
+          'File for first product (only when additional cost has enableUpload = true)'
+      },
+      'products[1].file': {
+        type: 'string',
+        format: 'binary',
+        description:
+          'File for second product (only when additional cost has enableUpload = true)'
+      }
+    },
+    description:
+      'Multipart form data version. All fields are the same as JSON version. Files can be uploaded for products when an additional cost has enableUpload = true. File naming pattern: products[productIndex].file'
   }
 }
 

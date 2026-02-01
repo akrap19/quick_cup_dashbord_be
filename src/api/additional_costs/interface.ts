@@ -20,6 +20,8 @@ export interface ICreateAdditionalCost extends IServiceMethod {
   acquisitionType: AcquisitionType
   price: number
   calculationStatus?: ProductStateStatus | null
+  maxPieces?: number | null
+  enableUpload?: boolean
 }
 
 export interface IUpdateAdditionalCost extends IServiceMethod {
@@ -30,6 +32,8 @@ export interface IUpdateAdditionalCost extends IServiceMethod {
   acquisitionType?: AcquisitionType
   price?: number
   calculationStatus?: ProductStateStatus | null
+  maxPieces?: number | null
+  enableUpload?: boolean
 }
 
 export interface IGetAdditionalCostById extends IServiceMethod {

@@ -4,6 +4,7 @@ import { MediaService } from '../media/mediaService'
 import fileUpload from 'express-fileupload'
 import {
   ACCEPTED_AUDIO_TYPES,
+  ACCEPTED_FILE_TYPES,
   ACCEPTED_IMAGE_TYPES,
   ACCEPTED_VIDEO_TYPES,
   MediaType
@@ -58,6 +59,16 @@ export class MediaController {
       }
     }
 
+    if (type == MediaType.FILE) {
+      // If ACCEPTED_FILE_TYPES is empty, accept all file types
+      if (
+        ACCEPTED_FILE_TYPES.length > 0 &&
+        !ACCEPTED_FILE_TYPES.includes(media.mimetype)
+      ) {
+        return next({ code: ResponseCode.WRONG_INPUT_TYPE })
+      }
+    }
+
     const { mediaId, code } = await this.mediaService.createMedia({
       type,
       path: `${type.toLowerCase()}/`,
@@ -79,5 +90,42 @@ export class MediaController {
     })
 
     return next({ code })
+  }
+
+  downloadMedia = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const input = res.locals.input ?? {}
+    const { mediaId } = input
+
+    const result = await this.mediaService.downloadMedia({
+      mediaId
+    })
+
+    if (!result.data) {
+      return next({ code: result.code })
+    }
+
+    // Type guard: check if data has the expected structure
+    const fileData = result.data as {
+      buffer: Buffer
+      fileName: string
+      mimeType: string
+    }
+    if (!fileData.buffer || !fileData.fileName || !fileData.mimeType) {
+      return next({ code: result.code })
+    }
+
+    const { buffer, fileName, mimeType } = fileData
+
+    // Set headers for file download
+    res.setHeader('Content-Type', mimeType)
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`)
+    res.setHeader('Content-Length', buffer.length.toString())
+
+    // Send the file buffer
+    res.send(buffer)
   }
 }

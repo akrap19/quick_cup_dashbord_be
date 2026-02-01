@@ -15,6 +15,7 @@ import {
   ICreateProduct,
   IDeleteProduct,
   IGetAllProductPrices,
+  IGetMyProducts,
   IGetProductById,
   IListProducts,
   IProductService,
@@ -40,7 +41,7 @@ import {
 import { ServicePrice } from '../service/servicePriceModel'
 import { ServiceLocationModel } from '../service_location/serviceLocationModel'
 import { User } from '../user/userModel'
-import { getFileURL, deleteFile } from '../../services/cpanel'
+import { getFileURL, deleteFile, downloadFile } from '../../services/cpanel'
 
 type ListProductsResponse = Awaited<AsyncResponse<IProductsPagination>>
 type ProductResponse = Awaited<AsyncResponse<Product>>
@@ -142,6 +143,7 @@ export class ProductsService implements IProductService {
         .andWhere('product.status != :deletedStatus', {
           deletedStatus: ProductStatus.DELETED
         })
+        .andWhere('product.ownedBy IS NULL')
 
       if (typeof acquisitionType === 'string') {
         query.andWhere('product.acquisitionType = :acquisitionType', {
@@ -159,6 +161,7 @@ export class ProductsService implements IProductService {
       const [products, count] = await query
         .leftJoinAndSelect('product.images', 'images')
         .leftJoinAndSelect('images.media', 'media')
+        .leftJoinAndSelect('product.designTemplate', 'designTemplate')
         .leftJoinAndSelect('product.prices', 'prices')
         .leftJoinAndSelect('product.productStates', 'productStates')
         .leftJoinAndSelect('productStates.service', 'stateService')
@@ -344,12 +347,317 @@ export class ProductsService implements IProductService {
               }))
             : []
 
+          // Get design template URL if exists
+          const designTemplate = product.designTemplate
+            ? {
+                id: product.designTemplate.id,
+                name: product.designTemplate.name,
+                url:
+                  (await getFileURL(product.designTemplate.url)) ||
+                  product.designTemplate.url
+              }
+            : null
+
           return {
             ...product,
             images,
             prices,
             servicePrices,
-            productStates
+            productStates,
+            designTemplate
+          }
+        })
+      )
+
+      const response = {
+        products: productsWithImages,
+        pagination: {
+          count,
+          page: currentPage,
+          limit: currentLimit
+        },
+        code
+      }
+
+      return response as unknown as ListProductsResponse
+    } catch (err: any) {
+      code = ResponseCode.SERVER_ERROR
+      logger.error({
+        code,
+        message: getResponseMessage(code),
+        stack: err.stack
+      })
+    }
+
+    return { code } as unknown as ListProductsResponse
+  }
+
+  getMyProducts = async ({
+    userId,
+    search,
+    page = 1,
+    limit = 25,
+    queryRunner
+  }: IGetMyProducts): AsyncResponse<IProductsPagination> => {
+    let code: ResponseCode = ResponseCode.OK
+
+    try {
+      const currentPage = page && page > 0 ? page : 1
+      const currentLimit = limit && limit > 0 ? limit : 25
+
+      const repository = queryRunner
+        ? queryRunner.manager.getRepository(Product)
+        : this.productRepository
+
+      // Query products owned by the user
+      const query = repository
+        .createQueryBuilder('product')
+        .andWhere('product.status != :deletedStatus', {
+          deletedStatus: ProductStatus.DELETED
+        })
+        .andWhere('product.ownedBy = :userId', { userId })
+
+      if (search) {
+        const searchLike = `%${search.toLowerCase()}%`
+        query.andWhere('(LOWER(product.name) LIKE :searchLike)', { searchLike })
+      }
+
+      const offset = (currentPage - 1) * currentLimit
+
+      const [products, count] = await query
+        .leftJoinAndSelect('product.images', 'images')
+        .leftJoinAndSelect('images.media', 'media')
+        .leftJoinAndSelect('product.designTemplate', 'designTemplate')
+        .leftJoinAndSelect('product.prices', 'prices')
+        .leftJoinAndSelect('product.productStates', 'productStates')
+        .leftJoinAndSelect('productStates.service', 'stateService')
+        .leftJoinAndSelect(
+          'productStates.serviceLocation',
+          'stateServiceLocation'
+        )
+        .leftJoinAndSelect('productStates.user', 'stateUser')
+        .orderBy('product.createdAt', 'DESC')
+        .addOrderBy('prices.minQuantity', 'ASC')
+        .skip(offset)
+        .take(currentLimit)
+        .getManyAndCount()
+
+      // Get all services with their default prices (fetch once for efficiency)
+      const allServices = await this.serviceRepository.find({
+        relations: ['prices'],
+        order: { id: 'ASC' }
+      })
+
+      // Get all product-specific service prices for products in this page
+      const productIds = products.map((p) => p.id)
+      const allProductServicePrices =
+        productIds.length > 0
+          ? await this.productServicePriceRepository.find({
+              where: { productId: In(productIds) },
+              relations: ['service'],
+              order: { productId: 'ASC', serviceId: 'ASC', minQuantity: 'ASC' }
+            })
+          : []
+
+      // Group product service prices by productId and serviceId
+      const productServicePricesMap = new Map<
+        string,
+        Map<string, ProductServicePrice[]>
+      >()
+      allProductServicePrices.forEach((price) => {
+        if (!productServicePricesMap.has(price.productId)) {
+          productServicePricesMap.set(price.productId, new Map())
+        }
+        const productMap = productServicePricesMap.get(price.productId)!
+        if (!productMap.has(price.serviceId)) {
+          productMap.set(price.serviceId, [])
+        }
+        productMap.get(price.serviceId)!.push(price)
+      })
+
+      // Transform products to include image URLs, sorted prices, and service prices
+      const productsWithImages = await Promise.all(
+        products.map(async (product) => {
+          const images = product.images
+            ? await Promise.all(
+                product.images.map(async (img: ProductMedia) => {
+                  const url = await getFileURL(img.media.url)
+                  return {
+                    id: img.id,
+                    mediaId: img.media.id,
+                    name: img.media.name,
+                    url: url || img.media.url,
+                    createdAt: img.createdAt
+                  }
+                })
+              )
+            : []
+
+          // Get client-specific prices if available
+          const clientPrices = await this.clientProductPriceRepository.find({
+            where: {
+              clientId: userId,
+              productId: product.id
+            },
+            order: { minQuantity: 'ASC' }
+          })
+
+          const prices =
+            clientPrices.length > 0
+              ? clientPrices.map((price) => ({
+                  id: price.id,
+                  minQuantity: price.minQuantity,
+                  maxQuantity: price.maxQuantity ?? null,
+                  price: price.price,
+                  createdAt: price.createdAt,
+                  updatedAt: price.updatedAt
+                }))
+              : product.prices
+              ? [...product.prices]
+                  .sort((a, b) => a.minQuantity - b.minQuantity)
+                  .map((price) => ({
+                    id: price.id,
+                    minQuantity: price.minQuantity,
+                    maxQuantity: price.maxQuantity ?? null,
+                    price: price.price,
+                    createdAt: price.createdAt,
+                    updatedAt: price.updatedAt
+                  }))
+              : []
+
+          // Filter services by product's acquisition type
+          const filteredServices = allServices.filter((service) => {
+            if (!service.acquisitionType) {
+              return false
+            }
+            // If service has 'both', include it for any product acquisition type
+            if (service.acquisitionType === ServiceAcquisitionType.BOTH) {
+              return true
+            }
+            // Otherwise, only include if service acquisition type matches product acquisition type
+            const productAcquisitionTypeAsService =
+              product.acquisitionType === AcquisitionType.BUY
+                ? ServiceAcquisitionType.BUY
+                : ServiceAcquisitionType.RENT
+            return service.acquisitionType === productAcquisitionTypeAsService
+          })
+
+          // Get product-specific service prices for this product
+          const productServicePricesForProduct =
+            productServicePricesMap.get(product.id) || new Map()
+
+          // Determine which acquisition type to use based on product
+          const relevantAcquisitionType =
+            product.acquisitionType === AcquisitionType.BUY
+              ? ServiceAcquisitionType.BUY
+              : ServiceAcquisitionType.RENT
+
+          // Build servicePrices: use product service prices if available, otherwise use default service prices
+          const servicePrices = filteredServices.map((service) => {
+            const productServicePricesForService =
+              productServicePricesForProduct.get(service.id)
+
+            // If product has custom prices for this service, use those
+            if (
+              productServicePricesForService &&
+              productServicePricesForService.length > 0
+            ) {
+              return {
+                serviceId: service.id,
+                serviceName: service.name || '',
+                billingInterval: service.billingInterval ?? null,
+                isDefaultServiceForBuy: service.isDefaultServiceForBuy ?? null,
+                isDefaultServiceForRent:
+                  service.isDefaultServiceForRent ?? null,
+                inputTypeForBuy: service.inputTypeForBuy ?? null,
+                inputTypeForRent: service.inputTypeForRent ?? null,
+                prices: productServicePricesForService.map(
+                  (price: ProductServicePrice) => ({
+                    id: price.id,
+                    minQuantity: price.minQuantity,
+                    maxQuantity: price.maxQuantity ?? null,
+                    price: price.price,
+                    createdAt: price.createdAt,
+                    updatedAt: price.updatedAt
+                  })
+                )
+              }
+            }
+
+            // Otherwise, use default service prices filtered by product's acquisition type
+            const allDefaultPrices = service.prices || []
+            const defaultPrices = allDefaultPrices
+              .filter((p) => p.acquisitionType === relevantAcquisitionType)
+              .sort((a, b) => a.minQuantity - b.minQuantity)
+
+            return {
+              serviceId: service.id,
+              serviceName: service.name || '',
+              billingInterval: service.billingInterval ?? null,
+              isDefaultServiceForBuy: service.isDefaultServiceForBuy ?? null,
+              isDefaultServiceForRent: service.isDefaultServiceForRent ?? null,
+              inputTypeForBuy: service.inputTypeForBuy ?? null,
+              inputTypeForRent: service.inputTypeForRent ?? null,
+              prices: defaultPrices.map((price) => ({
+                id: price.id,
+                minQuantity: price.minQuantity,
+                maxQuantity: price.maxQuantity ?? null,
+                price: price.price,
+                createdAt: price.createdAt,
+                updatedAt: price.updatedAt
+              }))
+            }
+          })
+
+          // Get product states
+          const productStates = product.productStates
+            ? product.productStates.map((state) => ({
+                id: state.id,
+                status: state.status,
+                location: state.location,
+                quantity: state.quantity,
+                serviceLocationId: state.serviceLocationId ?? null,
+                serviceLocation: state.serviceLocation
+                  ? {
+                      id: state.serviceLocation.id,
+                      city: state.serviceLocation.city,
+                      address: state.serviceLocation.address,
+                      email: state.serviceLocation.email,
+                      phone: state.serviceLocation.phone
+                    }
+                  : null,
+                userId: state.userId ?? null,
+                user: state.user
+                  ? {
+                      id: state.user.id,
+                      firstName: state.user.firstName,
+                      lastName: state.user.lastName,
+                      email: state.user.email
+                    }
+                  : null,
+                createdAt: state.createdAt,
+                updatedAt: state.updatedAt
+              }))
+            : []
+
+          // Get design template URL if exists
+          const designTemplate = product.designTemplate
+            ? {
+                id: product.designTemplate.id,
+                name: product.designTemplate.name,
+                url:
+                  (await getFileURL(product.designTemplate.url)) ||
+                  product.designTemplate.url
+              }
+            : null
+
+          return {
+            ...product,
+            images,
+            prices,
+            servicePrices,
+            productStates,
+            designTemplate
           }
         })
       )
@@ -386,15 +694,12 @@ export class ProductsService implements IProductService {
     let code: ResponseCode = ResponseCode.OK
 
     try {
-      const repository = queryRunner
-        ? queryRunner.manager.getRepository(Product)
-        : this.productRepository
-
-      const product = await repository.findOne({
+      const product = await this.productRepository.findOne({
         where: { id: productId, status: ProductStatus.ACTIVE },
         relations: [
           'images',
           'images.media',
+          'designTemplate',
           'prices',
           'productStates',
           'productStates.service',
@@ -578,45 +883,141 @@ export class ProductsService implements IProductService {
         }
       })
 
-      // Get product states
-      const productStates = product.productStates
-        ? product.productStates.map((state) => ({
-            id: state.id,
-            status: state.status,
-            location: state.location,
-            quantity: state.quantity,
-            serviceLocationId: state.serviceLocationId ?? null,
-            serviceLocation: state.serviceLocation
-              ? {
-                  id: state.serviceLocation.id,
-                  city: state.serviceLocation.city,
-                  address: state.serviceLocation.address,
-                  email: state.serviceLocation.email,
-                  phone: state.serviceLocation.phone,
-                  serviceName: state.serviceLocation.service?.name ?? null
-                }
-              : null,
-            userId: state.userId ?? null,
-            user: state.user
-              ? {
-                  id: state.user.id,
-                  firstName: state.user.firstName,
-                  lastName: state.user.lastName,
-                  email: state.user.email,
-                  companyName: state.user.companyName ?? null
-                }
-              : null,
-            createdAt: state.createdAt,
-            updatedAt: state.updatedAt
-          }))
-        : []
+      // Get product states - filter out damaged and aggregate by status, location, and userId/serviceLocationId
+      let productStates: Array<{
+        id: string
+        status: ProductStateStatus
+        location: ProductStateLocation
+        quantity: number
+        serviceLocationId: string | null
+        serviceLocation: {
+          id: string
+          city: string
+          address: string
+          email: string
+          phone: string | null
+          serviceName: string | null
+        } | null
+        userId: string | null
+        user: {
+          id: string
+          firstName: string
+          lastName: string
+          email: string
+          companyName: string | null
+        } | null
+        createdAt: Date
+        updatedAt: Date
+      }> = []
+
+      if (product.productStates) {
+        // Filter out damaged states
+        const filteredStates = product.productStates.filter(
+          (state) => state.status !== ProductStateStatus.DAMAGED
+        )
+
+        // Group by status, location, and userId/serviceLocationId, then sum quantities
+        const stateMap = new Map<
+          string,
+          {
+            status: ProductStateStatus
+            location: ProductStateLocation
+            quantity: number
+            serviceLocationId: string | null
+            serviceLocation: (typeof product.productStates)[0]['serviceLocation']
+            userId: string | null
+            user: (typeof product.productStates)[0]['user']
+            createdAt: Date
+            updatedAt: Date
+          }
+        >()
+
+        for (const state of filteredStates) {
+          // Create a unique key based on status, location, and userId/serviceLocationId
+          const groupKey = `${state.status}-${state.location}-${
+            state.location === ProductStateLocation.USER
+              ? state.userId ?? 'null'
+              : state.serviceLocationId ?? 'null'
+          }`
+
+          if (stateMap.has(groupKey)) {
+            // Aggregate: add quantity to existing state
+            const existing = stateMap.get(groupKey)!
+            existing.quantity += state.quantity
+            // Keep the most recent updatedAt
+            if (state.updatedAt > existing.updatedAt) {
+              existing.updatedAt = state.updatedAt
+            }
+          } else {
+            // Create new entry
+            stateMap.set(groupKey, {
+              status: state.status,
+              location: state.location,
+              quantity: state.quantity,
+              serviceLocationId: state.serviceLocationId ?? null,
+              serviceLocation: state.serviceLocation ?? null,
+              userId: state.userId ?? null,
+              user: state.user ?? null,
+              createdAt: state.createdAt,
+              updatedAt: state.updatedAt
+            })
+          }
+        }
+
+        // Convert map to array and format
+        productStates = Array.from(stateMap.values()).map((state) => ({
+          id: `${state.status}-${state.location}-${
+            state.location === ProductStateLocation.USER
+              ? state.userId ?? 'null'
+              : state.serviceLocationId ?? 'null'
+          }`, // Generate a composite ID for aggregated states
+          status: state.status,
+          location: state.location,
+          quantity: state.quantity,
+          serviceLocationId: state.serviceLocationId,
+          serviceLocation: state.serviceLocation
+            ? {
+                id: state.serviceLocation.id,
+                city: state.serviceLocation.city,
+                address: state.serviceLocation.address,
+                email: state.serviceLocation.email,
+                phone: state.serviceLocation.phone ?? null,
+                serviceName: state.serviceLocation.service?.name ?? null
+              }
+            : null,
+          userId: state.userId,
+          user: state.user
+            ? {
+                id: state.user.id,
+                firstName: state.user.firstName,
+                lastName: state.user.lastName,
+                email: state.user.email,
+                companyName: state.user.companyName ?? null
+              }
+            : null,
+          createdAt: state.createdAt,
+          updatedAt: state.updatedAt
+        }))
+      }
+
+      // Get design template URL if exists
+      const designTemplate = product.designTemplate
+        ? {
+            id: product.designTemplate.id,
+            name: product.designTemplate.name,
+            url:
+              (await getFileURL(product.designTemplate.url)) ||
+              product.designTemplate.url
+          }
+        : null
 
       const productWithImages = {
         ...product,
         images,
         prices,
         servicePrices,
-        productStates
+        productStates,
+        designTemplate
       }
 
       return { product: productWithImages, code } as unknown as ProductResponse
@@ -642,6 +1043,7 @@ export class ProductsService implements IProductService {
     description,
     acquisitionType,
     imageIds,
+    designTemplateId,
     prices,
     servicePrices,
     productStates,
@@ -654,6 +1056,19 @@ export class ProductsService implements IProductService {
         ? queryRunner.manager.getRepository(Product)
         : this.productRepository
 
+      // Validate designTemplateId if provided
+      if (designTemplateId) {
+        const mediaRepository = queryRunner
+          ? queryRunner.manager.getRepository(Media)
+          : this.mediaRepository
+        const mediaExists = await mediaRepository.findOne({
+          where: { id: designTemplateId }
+        })
+        if (!mediaExists) {
+          return { code: ResponseCode.MEDIA_NOT_FOUND }
+        }
+      }
+
       const product = repository.create({
         name,
         size: size ?? undefined,
@@ -662,7 +1077,8 @@ export class ProductsService implements IProductService {
         transportationUnit: transportationUnit ?? undefined,
         unitsPerTransportationUnit: unitsPerTransportationUnit ?? undefined,
         description: description ?? null,
-        acquisitionType
+        acquisitionType,
+        designTemplateId: designTemplateId ?? null
       })
 
       const savedProduct = await repository.save(product)
@@ -868,6 +1284,7 @@ export class ProductsService implements IProductService {
         relations: [
           'images',
           'images.media',
+          'designTemplate',
           'prices',
           'productStates',
           'productStates.service',
@@ -934,11 +1351,23 @@ export class ProductsService implements IProductService {
           }))
         : []
 
+      // Get design template URL if exists
+      const designTemplate = productWithImages.designTemplate
+        ? {
+            id: productWithImages.designTemplate.id,
+            name: productWithImages.designTemplate.name,
+            url:
+              (await getFileURL(productWithImages.designTemplate.url)) ||
+              productWithImages.designTemplate.url
+          }
+        : null
+
       const productResponse = {
         ...productWithImages,
         images,
         prices: sortedPrices,
-        productStates: transformedProductStates
+        productStates: transformedProductStates,
+        designTemplate
       }
 
       return { product: productResponse, code } as unknown as ProductResponse
@@ -966,6 +1395,7 @@ export class ProductsService implements IProductService {
     acquisitionType,
     imageIdsToAdd,
     imageIdsToRemove,
+    designTemplateId,
     prices,
     servicePrices,
     productStates,
@@ -1019,6 +1449,22 @@ export class ProductsService implements IProductService {
 
       if (typeof description !== 'undefined') {
         updateData.description = description ?? null
+      }
+
+      if (typeof designTemplateId !== 'undefined') {
+        // Validate designTemplateId if provided
+        if (designTemplateId) {
+          const mediaRepository = queryRunner
+            ? queryRunner.manager.getRepository(Media)
+            : this.mediaRepository
+          const mediaExists = await mediaRepository.findOne({
+            where: { id: designTemplateId }
+          })
+          if (!mediaExists) {
+            return { code: ResponseCode.MEDIA_NOT_FOUND }
+          }
+        }
+        updateData.designTemplateId = designTemplateId ?? null
       }
 
       // Update product fields if any
@@ -2051,5 +2497,80 @@ export class ProductsService implements IProductService {
       })
       return { code }
     }
+  }
+
+  downloadDesignTemplate = async ({
+    productId
+  }: {
+    productId: string
+  }): AsyncResponse<{ buffer: Buffer; fileName: string; mimeType: string }> => {
+    let code: ResponseCode = ResponseCode.OK
+
+    try {
+      const product = await this.productRepository.findOne({
+        where: { id: productId, status: ProductStatus.ACTIVE },
+        relations: ['designTemplate']
+      })
+
+      if (!product) {
+        return { code: ResponseCode.NOT_FOUND }
+      }
+
+      if (!product.designTemplate) {
+        return { code: ResponseCode.NOT_FOUND }
+      }
+
+      // Download the file from SFTP
+      const buffer = await downloadFile(product.designTemplate.url)
+
+      if (!buffer) {
+        return { code: ResponseCode.FAILED_DEPENDENCY }
+      }
+
+      // Determine MIME type from file extension
+      const fileName = product.designTemplate.name
+      const extension = fileName.split('.').pop()?.toLowerCase()
+      let mimeType = 'application/octet-stream'
+
+      const mimeTypes: Record<string, string> = {
+        pdf: 'application/pdf',
+        doc: 'application/msword',
+        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        xls: 'application/vnd.ms-excel',
+        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        zip: 'application/zip',
+        rar: 'application/x-rar-compressed',
+        psd: 'image/vnd.adobe.photoshop',
+        ai: 'application/postscript',
+        eps: 'application/postscript',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        png: 'image/png',
+        gif: 'image/gif',
+        svg: 'image/svg+xml'
+      }
+
+      if (extension && mimeTypes[extension]) {
+        mimeType = mimeTypes[extension]
+      }
+
+      return {
+        data: {
+          buffer,
+          fileName,
+          mimeType
+        },
+        code
+      }
+    } catch (err: any) {
+      code = ResponseCode.SERVER_ERROR
+      logger.error({
+        code,
+        message: getResponseMessage(code),
+        stack: err.stack
+      })
+    }
+
+    return { code }
   }
 }

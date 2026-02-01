@@ -147,6 +147,8 @@ export class AdditionalCostsService implements IAdditionalCostService {
     acquisitionType,
     price,
     calculationStatus,
+    maxPieces,
+    enableUpload,
     queryRunner
   }: ICreateAdditionalCost): AsyncResponse<AdditionalCost> => {
     let code: ResponseCode = ResponseCode.OK
@@ -162,7 +164,9 @@ export class AdditionalCostsService implements IAdditionalCostService {
         billingType,
         acquisitionType,
         price,
-        calculationStatus
+        calculationStatus,
+        maxPieces,
+        enableUpload: enableUpload ?? false
       })
 
       const savedAdditionalCost = await repository.save(additionalCost)
@@ -191,6 +195,8 @@ export class AdditionalCostsService implements IAdditionalCostService {
     acquisitionType,
     price,
     calculationStatus,
+    maxPieces,
+    enableUpload,
     queryRunner
   }: IUpdateAdditionalCost): AsyncResponse<AdditionalCost> => {
     let code: ResponseCode = ResponseCode.OK
@@ -227,6 +233,12 @@ export class AdditionalCostsService implements IAdditionalCostService {
       }
       if (typeof calculationStatus !== 'undefined') {
         updateData.calculationStatus = calculationStatus
+      }
+      if (typeof maxPieces !== 'undefined') {
+        updateData.maxPieces = maxPieces
+      }
+      if (typeof enableUpload !== 'undefined') {
+        updateData.enableUpload = enableUpload
       }
 
       if (Object.keys(updateData).length > 0) {

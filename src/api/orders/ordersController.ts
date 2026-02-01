@@ -102,7 +102,7 @@ export class OrdersController {
         ? totalAmount
         : totalAmount
         ? Number(totalAmount)
-        : undefined
+        : 0
 
     if (typeof numericAmount !== 'number' || Number.isNaN(numericAmount)) {
       return next({ code: ResponseCode.INVALID_INPUT })
@@ -238,6 +238,7 @@ export class OrdersController {
 
     return next({ data: order, code })
   }
+
 
   deleteOrder = async (req: Request, res: Response, next: NextFunction) => {
     const input = res.locals.input ?? {}
