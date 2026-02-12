@@ -28,6 +28,10 @@ export interface IDeleteEvent extends IServiceMethod {
   eventId: string
 }
 
+export interface IBulkDeleteEvents extends IServiceMethod {
+  eventIds: string[]
+}
+
 export interface IGetEventById extends IServiceMethod {
   eventId: string
   userId?: string | null
@@ -55,4 +59,5 @@ export interface IEventService {
   createEvent(params: ICreateEvent): AsyncResponse<EventModel>
   updateEvent(params: IUpdateEvent): AsyncResponse<EventModel>
   deleteEvent(params: IDeleteEvent): AsyncResponse<null>
+  bulkDeleteEvents(params: IBulkDeleteEvents): AsyncResponse<null>
 }

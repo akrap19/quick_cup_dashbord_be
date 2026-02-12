@@ -157,6 +157,21 @@ export const serviceIdParamSchema = (req: Request) => {
   }
 }
 
+export const bulkDeleteServiceSchema = (req: Request) => {
+  return {
+    schema: Joi.object()
+      .keys({
+        serviceIds: Joi.array()
+          .items(uuidSchema)
+          .required()
+      })
+      .options({ abortEarly: false }),
+    input: {
+      serviceIds: req.body.serviceIds
+    }
+  }
+}
+
 export const getAllServicePricesSchema = (req: Request) => {
   const rawAcquisitionType = req.query.acquisitionType
 

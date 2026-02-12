@@ -6,6 +6,7 @@ import { validate } from '../../middleware/validation'
 import { RoleType } from '../role/interface'
 import { AdditionalCostsController } from './additionalCostController'
 import {
+  bulkDeleteAdditionalCostSchema,
   createAdditionalCostSchema,
   listAdditionalCostsSchema,
   additionalCostIdParamSchema,
@@ -47,6 +48,14 @@ additionalCostRouter.put(
   requireRole(adminRoles),
   validate(updateAdditionalCostSchema),
   additionalCostsController.updateAdditionalCost
+)
+
+additionalCostRouter.delete(
+  '/bulk',
+  requireToken,
+  requireRole(adminRoles),
+  validate(bulkDeleteAdditionalCostSchema),
+  additionalCostsController.bulkDeleteAdditionalCosts
 )
 
 additionalCostRouter.delete(

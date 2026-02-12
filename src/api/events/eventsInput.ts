@@ -97,3 +97,18 @@ export const eventIdParamSchema = (req: Request) => {
     }
   }
 }
+
+export const bulkDeleteEventSchema = (req: Request) => {
+  return {
+    schema: Joi.object()
+      .keys({
+        eventIds: Joi.array()
+          .items(uuidSchema)
+          .required()
+      })
+      .options({ abortEarly: false }),
+    input: {
+      eventIds: req.body.eventIds
+    }
+  }
+}

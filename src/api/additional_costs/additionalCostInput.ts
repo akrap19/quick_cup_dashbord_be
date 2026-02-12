@@ -147,3 +147,18 @@ export const additionalCostIdParamSchema = (req: Request) => {
     }
   }
 }
+
+export const bulkDeleteAdditionalCostSchema = (req: Request) => {
+  return {
+    schema: Joi.object()
+      .keys({
+        additionalCostIds: Joi.array()
+          .items(uuidSchema)
+          .required()
+      })
+      .options({ abortEarly: false }),
+    input: {
+      additionalCostIds: req.body.additionalCostIds
+    }
+  }
+}

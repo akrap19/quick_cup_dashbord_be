@@ -152,4 +152,19 @@ export class EventsController {
 
     return next({ code })
   }
+
+  bulkDeleteEvents = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const input = res.locals.input ?? {}
+    const { eventIds } = input
+
+    const { code } = await this.eventsService.bulkDeleteEvents({
+      eventIds
+    })
+
+    return next({ code })
+  }
 }

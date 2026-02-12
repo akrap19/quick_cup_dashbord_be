@@ -6,6 +6,7 @@ import { validate } from '../../middleware/validation'
 import { RoleType } from '../role/interface'
 import { OrdersController } from './ordersController'
 import {
+  bulkDeleteOrderSchema,
   createOrderSchema,
   listOrdersSchema,
   orderIdParamSchema,
@@ -53,6 +54,14 @@ ordersRouter.put(
   requireRole(adminRoles),
   validate(updateOrderSchema),
   ordersController.updateOrder
+)
+
+ordersRouter.delete(
+  '/bulk',
+  requireToken,
+  requireRole(adminRoles),
+  validate(bulkDeleteOrderSchema),
+  ordersController.bulkDeleteOrders
 )
 
 ordersRouter.delete(

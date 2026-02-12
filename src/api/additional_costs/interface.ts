@@ -53,6 +53,10 @@ export interface IDeleteAdditionalCost extends IServiceMethod {
   additionalCostId: string
 }
 
+export interface IBulkDeleteAdditionalCosts extends IServiceMethod {
+  additionalCostIds: string[]
+}
+
 export interface IAdditionalCostsPagination {
   additionalCosts: AdditionalCost[]
   pagination: {
@@ -76,4 +80,7 @@ export interface IAdditionalCostService {
     params: IUpdateAdditionalCost
   ): AsyncResponse<AdditionalCost>
   deleteAdditionalCost(params: IDeleteAdditionalCost): AsyncResponse<null>
+  bulkDeleteAdditionalCosts(
+    params: IBulkDeleteAdditionalCosts
+  ): AsyncResponse<null>
 }

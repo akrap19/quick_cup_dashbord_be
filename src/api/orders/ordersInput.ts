@@ -172,6 +172,21 @@ export const orderIdParamSchema = (req: Request) => {
   }
 }
 
+export const bulkDeleteOrderSchema = (req: Request) => {
+  return {
+    schema: Joi.object()
+      .keys({
+        orderIds: Joi.array()
+          .items(uuidSchema)
+          .required()
+      })
+      .options({ abortEarly: false }),
+    input: {
+      orderIds: req.body.orderIds
+    }
+  }
+}
+
 export const updateOrderStatusSchema = (req: Request) => {
   return {
     schema: Joi.object()

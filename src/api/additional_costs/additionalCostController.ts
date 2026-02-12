@@ -278,4 +278,20 @@ export class AdditionalCostsController {
 
     return next({ code })
   }
+
+  bulkDeleteAdditionalCosts = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const input = res.locals.input ?? {}
+    const { additionalCostIds } = input
+
+    const { code } =
+      await this.additionalCostsService.bulkDeleteAdditionalCosts({
+        additionalCostIds
+      })
+
+    return next({ code })
+  }
 }

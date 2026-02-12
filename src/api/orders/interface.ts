@@ -74,6 +74,10 @@ export interface IDeleteOrder extends IServiceMethod {
   orderId: string
 }
 
+export interface IBulkDeleteOrders extends IServiceMethod {
+  orderIds: string[]
+}
+
 export interface IGetOrderById extends IServiceMethod {
   orderId: string
   customerId?: string | null
@@ -109,4 +113,5 @@ export interface IOrderService {
   updateOrder(params: IUpdateOrder): AsyncResponse<Order>
   updateOrderStatus(params: IUpdateOrderStatus): AsyncResponse<Order>
   deleteOrder(params: IDeleteOrder): AsyncResponse<null>
+  bulkDeleteOrders(params: IBulkDeleteOrders): AsyncResponse<null>
 }

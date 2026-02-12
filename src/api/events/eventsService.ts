@@ -6,6 +6,7 @@ import { AppDataSource } from '../../services/typeorm'
 import { logger } from '../../logger'
 import { getResponseMessage } from '../../services/utils'
 import {
+  IBulkDeleteEvents,
   ICreateEvent,
   IDeleteEvent,
   IEventService,
@@ -314,6 +315,48 @@ export class EventsService implements IEventService {
         message: getResponseMessage(code),
         stack: err.stack
       })
+    }
+
+    return { code }
+  }
+
+  bulkDeleteEvents = async ({
+    eventIds
+  }: IBulkDeleteEvents): AsyncResponse<null> => {
+    let code: ResponseCode = ResponseCode.OK
+    const queryRunner = AppDataSource.createQueryRunner()
+
+    try {
+      await queryRunner.connect()
+      await queryRunner.startTransaction()
+
+      for (const eventId of eventIds) {
+        const deleteResult = await this.deleteEvent({
+          eventId,
+          queryRunner
+        })
+
+        if (deleteResult.code !== ResponseCode.OK) {
+          code = deleteResult.code
+          await queryRunner.rollbackTransaction()
+          await queryRunner.release()
+
+          return { code }
+        }
+      }
+
+      await queryRunner.commitTransaction()
+      await queryRunner.release()
+    } catch (err: any) {
+      code = ResponseCode.SERVER_ERROR
+      logger.error({
+        code,
+        message: getResponseMessage(code),
+        stack: err.stack
+      })
+
+      await queryRunner.rollbackTransaction()
+      await queryRunner.release()
     }
 
     return { code }

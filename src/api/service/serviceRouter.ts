@@ -1,6 +1,7 @@
 import express from 'express'
 import { ServicesController } from './serviceController'
 import {
+  bulkDeleteServiceSchema,
   calculateServicePriceForMultipleProductsSchema,
   calculateServicePriceSchema,
   createServiceSchema,
@@ -66,6 +67,14 @@ serviceRouter.put(
   requireRole(adminRoles),
   validate(updateServiceSchema),
   servicesController.updateService
+)
+
+serviceRouter.delete(
+  '/bulk',
+  requireToken,
+  requireRole(adminRoles),
+  validate(bulkDeleteServiceSchema),
+  servicesController.bulkDeleteServices
 )
 
 serviceRouter.delete(

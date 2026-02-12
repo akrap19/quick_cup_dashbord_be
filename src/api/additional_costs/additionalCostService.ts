@@ -6,6 +6,7 @@ import { AppDataSource } from '../../services/typeorm'
 import { logger } from '../../logger'
 import { getResponseMessage } from '../../services/utils'
 import {
+  IBulkDeleteAdditionalCosts,
   ICreateAdditionalCost,
   IDeleteAdditionalCost,
   IGetAdditionalCostById,
@@ -299,6 +300,48 @@ export class AdditionalCostsService implements IAdditionalCostService {
         message: getResponseMessage(code),
         stack: err.stack
       })
+    }
+
+    return { code } as unknown as DeleteAdditionalCostResponse
+  }
+
+  bulkDeleteAdditionalCosts = async ({
+    additionalCostIds
+  }: IBulkDeleteAdditionalCosts): AsyncResponse<null> => {
+    let code: ResponseCode = ResponseCode.OK
+    const queryRunner = AppDataSource.createQueryRunner()
+
+    try {
+      await queryRunner.connect()
+      await queryRunner.startTransaction()
+
+      for (const additionalCostId of additionalCostIds) {
+        const deleteResult = await this.deleteAdditionalCost({
+          additionalCostId,
+          queryRunner
+        })
+
+        if (deleteResult.code !== ResponseCode.OK) {
+          code = deleteResult.code
+          await queryRunner.rollbackTransaction()
+          await queryRunner.release()
+
+          return { code } as unknown as DeleteAdditionalCostResponse
+        }
+      }
+
+      await queryRunner.commitTransaction()
+      await queryRunner.release()
+    } catch (err: any) {
+      code = ResponseCode.SERVER_ERROR
+      logger.error({
+        code,
+        message: getResponseMessage(code),
+        stack: err.stack
+      })
+
+      await queryRunner.rollbackTransaction()
+      await queryRunner.release()
     }
 
     return { code } as unknown as DeleteAdditionalCostResponse

@@ -55,6 +55,10 @@ export interface IDeleteService extends IServiceMethod {
   serviceId: string
 }
 
+export interface IBulkDeleteServices extends IServiceMethod {
+  serviceIds: string[]
+}
+
 export interface IGetServiceById extends IServiceMethod {
   serviceId: string
 }
@@ -163,6 +167,7 @@ export interface IServiceService<T = unknown> {
   createService(params: ICreateService): AsyncResponse<T>
   updateService(params: IUpdateService): AsyncResponse<T>
   deleteService(params: IDeleteService): AsyncResponse<null>
+  bulkDeleteServices(params: IBulkDeleteServices): AsyncResponse<null>
   getAllServicePrices(
     params?: IGetAllServicePrices
   ): AsyncResponse<IAllServicePrices[]>

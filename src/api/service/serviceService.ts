@@ -7,6 +7,7 @@ import { logger } from '../../logger'
 import { getResponseMessage } from '../../services/utils'
 import {
   IAllServicePrices,
+  IBulkDeleteServices,
   ICalculateServicePrice,
   ICalculateServicePriceResponse,
   ICalculateServicePriceForMultipleProducts,
@@ -713,6 +714,48 @@ export class ServicesService implements IServiceService<ServiceModel> {
         message: getResponseMessage(code),
         stack: err.stack
       })
+    }
+
+    return { code } as unknown as DeleteResponse
+  }
+
+  bulkDeleteServices = async ({
+    serviceIds
+  }: IBulkDeleteServices): AsyncResponse<null> => {
+    let code: ResponseCode = ResponseCode.OK
+    const queryRunner = AppDataSource.createQueryRunner()
+
+    try {
+      await queryRunner.connect()
+      await queryRunner.startTransaction()
+
+      for (const serviceId of serviceIds) {
+        const deleteResult = await this.deleteService({
+          serviceId,
+          queryRunner
+        })
+
+        if (deleteResult.code !== ResponseCode.OK) {
+          code = deleteResult.code
+          await queryRunner.rollbackTransaction()
+          await queryRunner.release()
+
+          return { code } as unknown as DeleteResponse
+        }
+      }
+
+      await queryRunner.commitTransaction()
+      await queryRunner.release()
+    } catch (err: any) {
+      code = ResponseCode.SERVER_ERROR
+      logger.error({
+        code,
+        message: getResponseMessage(code),
+        stack: err.stack
+      })
+
+      await queryRunner.rollbackTransaction()
+      await queryRunner.release()
     }
 
     return { code } as unknown as DeleteResponse

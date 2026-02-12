@@ -251,6 +251,21 @@ export class OrdersController {
     return next({ code })
   }
 
+  bulkDeleteOrders = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const input = res.locals.input ?? {}
+    const { orderIds } = input
+
+    const { code } = await this.ordersService.bulkDeleteOrders({
+      orderIds
+    })
+
+    return next({ code })
+  }
+
   updateOrderStatus = async (
     req: Request,
     res: Response,

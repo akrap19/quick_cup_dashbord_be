@@ -6,6 +6,7 @@ import { validate } from '../../middleware/validation'
 import { RoleType } from '../role/interface'
 import { EventsController } from './eventsController'
 import {
+  bulkDeleteEventSchema,
   createEventSchema,
   eventIdParamSchema,
   listEventsSchema,
@@ -48,6 +49,14 @@ eventsRouter.put(
   requireRole(adminRoles),
   validate(updateEventSchema),
   eventsController.updateEvent
+)
+
+eventsRouter.delete(
+  '/bulk',
+  requireToken,
+  requireRole(adminRoles),
+  validate(bulkDeleteEventSchema),
+  eventsController.bulkDeleteEvents
 )
 
 eventsRouter.delete(

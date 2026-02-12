@@ -141,6 +141,21 @@ export class ServicesController {
     return next({ code })
   }
 
+  bulkDeleteServices = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const input = res.locals.input ?? {}
+    const { serviceIds } = input
+
+    const { code } = await this.servicesService.bulkDeleteServices({
+      serviceIds
+    })
+
+    return next({ code })
+  }
+
   getAllServicePrices = async (
     req: Request,
     res: Response,
