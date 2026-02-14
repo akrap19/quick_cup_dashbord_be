@@ -278,6 +278,7 @@ export class ProductsService implements IProductService {
                   service.isDefaultServiceForRent ?? null,
                 inputTypeForBuy: service.inputTypeForBuy ?? null,
                 inputTypeForRent: service.inputTypeForRent ?? null,
+                priceCalculationUnit: service.priceCalculationUnit ?? null,
                 prices: productServicePricesForService.map(
                   (price: ProductServicePrice) => ({
                     id: price.id,
@@ -305,6 +306,7 @@ export class ProductsService implements IProductService {
               isDefaultServiceForRent: service.isDefaultServiceForRent ?? null,
               inputTypeForBuy: service.inputTypeForBuy ?? null,
               inputTypeForRent: service.inputTypeForRent ?? null,
+              priceCalculationUnit: service.priceCalculationUnit ?? null,
               prices: defaultPrices.map((price) => ({
                 id: price.id,
                 minQuantity: price.minQuantity,
@@ -571,6 +573,7 @@ export class ProductsService implements IProductService {
                   service.isDefaultServiceForRent ?? null,
                 inputTypeForBuy: service.inputTypeForBuy ?? null,
                 inputTypeForRent: service.inputTypeForRent ?? null,
+                priceCalculationUnit: service.priceCalculationUnit ?? null,
                 prices: productServicePricesForService.map(
                   (price: ProductServicePrice) => ({
                     id: price.id,
@@ -598,6 +601,7 @@ export class ProductsService implements IProductService {
               isDefaultServiceForRent: service.isDefaultServiceForRent ?? null,
               inputTypeForBuy: service.inputTypeForBuy ?? null,
               inputTypeForRent: service.inputTypeForRent ?? null,
+              priceCalculationUnit: service.priceCalculationUnit ?? null,
               prices: defaultPrices.map((price) => ({
                 id: price.id,
                 minQuantity: price.minQuantity,
@@ -852,6 +856,7 @@ export class ProductsService implements IProductService {
           return {
             serviceId: service.id,
             serviceName: service.name || '',
+            priceCalculationUnit: service.priceCalculationUnit ?? null,
             prices: productServicePricesForService.map((price) => ({
               id: price.id,
               minQuantity: price.minQuantity,
@@ -872,6 +877,7 @@ export class ProductsService implements IProductService {
         return {
           serviceId: service.id,
           serviceName: service.name || '',
+          priceCalculationUnit: service.priceCalculationUnit ?? null,
           prices: defaultPrices.map((price) => ({
             id: price.id,
             minQuantity: price.minQuantity,

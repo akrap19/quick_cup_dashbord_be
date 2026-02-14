@@ -17,7 +17,7 @@ const orderServiceProductSchema = Joi.object({
 
 const orderServiceSchema = Joi.object({
   serviceId: uuidSchema.required(),
-  quantity: Joi.number().integer().min(1).required(),
+  quantity: Joi.number().integer().min(0).required(),
   price: Joi.number().precision(4).positive().optional(),
   serviceLocationId: uuidSchema.allow(null).optional(),
   quantityByProduct: Joi.array().items(orderServiceProductSchema).optional()
@@ -176,9 +176,7 @@ export const bulkDeleteOrderSchema = (req: Request) => {
   return {
     schema: Joi.object()
       .keys({
-        orderIds: Joi.array()
-          .items(uuidSchema)
-          .required()
+        orderIds: Joi.array().items(uuidSchema).required()
       })
       .options({ abortEarly: false }),
     input: {
