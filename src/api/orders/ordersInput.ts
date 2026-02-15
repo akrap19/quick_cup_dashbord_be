@@ -32,7 +32,7 @@ const orderAdditionalCostProductSchema = Joi.object({
 const orderAdditionalCostSchema = Joi.object({
   additionalCostId: uuidSchema.required(),
   price: Joi.number().precision(4).positive().optional(),
-  quantity: Joi.number().integer().min(1).allow(null).optional(),
+  quantity: Joi.number().integer().min(0).allow(null).optional(),
   quantityByProduct: Joi.array()
     .items(orderAdditionalCostProductSchema)
     .optional()

@@ -147,6 +147,7 @@ export class AdditionalCostsService implements IAdditionalCostService {
     billingType,
     acquisitionType,
     price,
+    calculationType,
     calculationStatus,
     maxPieces,
     enableUpload,
@@ -165,6 +166,7 @@ export class AdditionalCostsService implements IAdditionalCostService {
         billingType,
         acquisitionType,
         price,
+        calculationType,
         calculationStatus,
         maxPieces,
         enableUpload: enableUpload ?? false
@@ -195,6 +197,7 @@ export class AdditionalCostsService implements IAdditionalCostService {
     billingType,
     acquisitionType,
     price,
+    calculationType,
     calculationStatus,
     maxPieces,
     enableUpload,
@@ -231,6 +234,9 @@ export class AdditionalCostsService implements IAdditionalCostService {
       }
       if (typeof price !== 'undefined') {
         updateData.price = price
+      }
+      if (typeof calculationType !== 'undefined') {
+        updateData.calculationType = calculationType
       }
       if (typeof calculationStatus !== 'undefined') {
         updateData.calculationStatus = calculationStatus

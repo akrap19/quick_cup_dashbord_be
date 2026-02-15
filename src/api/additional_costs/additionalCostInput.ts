@@ -1,6 +1,6 @@
 import { Request } from 'express'
 import Joi from 'joi'
-import { MethodOfPayment, BillingType } from './interface'
+import { MethodOfPayment, BillingType, CalculationType } from './interface'
 import { AcquisitionType } from '../products/interface'
 import { ProductStateStatus } from '../product_state/interface'
 
@@ -17,7 +17,11 @@ const baseAdditionalCostBody = {
   acquisitionType: Joi.string()
     .valid(AcquisitionType.BUY, AcquisitionType.RENT)
     .optional(),
-  price: Joi.number().precision(4).min(0),
+  price: Joi.number().precision(4).min(0).allow(null).optional(),
+  calculationType: Joi.string()
+    .valid(CalculationType.OVERALL, CalculationType.BY_PRODUCT)
+    .allow(null)
+    .optional(),
   calculationStatus: Joi.string()
     .valid(
       ProductStateStatus.AVAILABLE,
@@ -95,8 +99,7 @@ export const createAdditionalCostSchema = (req: Request) => {
         name: baseAdditionalCostBody.name.required(),
         methodOfPayment: baseAdditionalCostBody.methodOfPayment.required(),
         billingType: baseAdditionalCostBody.billingType.required(),
-        acquisitionType: baseAdditionalCostBody.acquisitionType.required(),
-        price: baseAdditionalCostBody.price.required()
+        acquisitionType: baseAdditionalCostBody.acquisitionType.required()
       })
       .options({ abortEarly: false }),
     input: {
@@ -105,6 +108,7 @@ export const createAdditionalCostSchema = (req: Request) => {
       billingType: req.body.billingType,
       acquisitionType: req.body.acquisitionType,
       price: req.body.price,
+      calculationType: req.body.calculationType,
       calculationStatus: req.body.calculationStatus,
       maxPieces: req.body.maxPieces,
       enableUpload: req.body.enableUpload
@@ -128,6 +132,7 @@ export const updateAdditionalCostSchema = (req: Request) => {
       billingType: req.body.billingType,
       acquisitionType: req.body.acquisitionType,
       price: req.body.price,
+      calculationType: req.body.calculationType,
       calculationStatus: req.body.calculationStatus,
       maxPieces: req.body.maxPieces,
       enableUpload: req.body.enableUpload

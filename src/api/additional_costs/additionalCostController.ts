@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from 'express'
 import { autoInjectable } from 'tsyringe'
 import { ResponseCode } from '../../interface'
 import { AdditionalCostsService } from './additionalCostService'
-import { MethodOfPayment, BillingType } from './interface'
+import { MethodOfPayment, BillingType, CalculationType } from './interface'
 import { AcquisitionType } from '../products/interface'
 import { ProductStateStatus } from '../product_state/interface'
 
@@ -107,17 +107,38 @@ export class AdditionalCostsController {
       billingType,
       acquisitionType,
       price,
+      calculationType,
       calculationStatus,
       maxPieces,
       enableUpload
     } = input
 
     const numericPrice =
-      typeof price === 'number' ? price : price ? Number(price) : undefined
+      typeof price === 'number'
+        ? price
+        : price === null
+        ? null
+        : price !== undefined
+        ? Number(price)
+        : undefined
 
-    if (typeof numericPrice !== 'number' || Number.isNaN(numericPrice)) {
+    if (
+      typeof numericPrice !== 'undefined' &&
+      numericPrice !== null &&
+      (typeof numericPrice !== 'number' || Number.isNaN(numericPrice))
+    ) {
       return next({ code: ResponseCode.INVALID_INPUT })
     }
+
+    const calculationTypeFilter =
+      typeof calculationType === 'string' &&
+      Object.values(CalculationType).includes(
+        calculationType as CalculationType
+      )
+        ? (calculationType as CalculationType)
+        : calculationType === null
+        ? null
+        : undefined
 
     const calculationStatusFilter =
       typeof calculationStatus === 'string' &&
@@ -161,10 +182,14 @@ export class AdditionalCostsController {
         methodOfPayment,
         billingType,
         acquisitionType,
-        price: numericPrice,
+        price: numericPrice === null ? undefined : numericPrice,
+        calculationType:
+          calculationTypeFilter === null ? undefined : calculationTypeFilter,
         calculationStatus: calculationStatusFilter,
         maxPieces:
-          typeof numericMaxPieces === 'undefined' ? undefined : numericMaxPieces,
+          typeof numericMaxPieces === 'undefined'
+            ? undefined
+            : numericMaxPieces,
         enableUpload: booleanEnableUpload
       })
 
@@ -188,6 +213,7 @@ export class AdditionalCostsController {
       billingType,
       acquisitionType,
       price,
+      calculationType,
       calculationStatus,
       maxPieces,
       enableUpload
@@ -198,14 +224,31 @@ export class AdditionalCostsController {
     }
 
     const numericPrice =
-      typeof price === 'number' ? price : price ? Number(price) : undefined
+      typeof price === 'number'
+        ? price
+        : price === null
+        ? null
+        : price !== undefined
+        ? Number(price)
+        : undefined
 
     if (
       typeof numericPrice !== 'undefined' &&
+      numericPrice !== null &&
       (typeof numericPrice !== 'number' || Number.isNaN(numericPrice))
     ) {
       return next({ code: ResponseCode.INVALID_INPUT })
     }
+
+    const calculationTypeFilter =
+      typeof calculationType === 'string' &&
+      Object.values(CalculationType).includes(
+        calculationType as CalculationType
+      )
+        ? (calculationType as CalculationType)
+        : calculationType === null
+        ? null
+        : undefined
 
     const calculationStatusFilter =
       typeof calculationStatus === 'string' &&
@@ -250,10 +293,13 @@ export class AdditionalCostsController {
         methodOfPayment,
         billingType,
         acquisitionType,
-        price: numericPrice,
+        price: numericPrice === null ? undefined : numericPrice,
+        calculationType: calculationTypeFilter,
         calculationStatus: calculationStatusFilter,
         maxPieces:
-          typeof numericMaxPieces === 'undefined' ? undefined : numericMaxPieces,
+          typeof numericMaxPieces === 'undefined'
+            ? undefined
+            : numericMaxPieces,
         enableUpload: booleanEnableUpload
       })
 

@@ -6,7 +6,7 @@ import {
   UpdateDateColumn
 } from 'typeorm'
 import { AcquisitionType } from '../products/interface'
-import { MethodOfPayment, BillingType } from './interface'
+import { MethodOfPayment, BillingType, CalculationType } from './interface'
 import { ProductStateStatus } from '../product_state/interface'
 import { decimalTransformer } from '../../services/utils'
 
@@ -43,9 +43,18 @@ export class AdditionalCost {
     type: 'decimal',
     precision: 10,
     scale: 4,
-    transformer: decimalTransformer
+    transformer: decimalTransformer,
+    nullable: true
   })
-  price!: number
+  price?: number | null
+
+  @Column({
+    name: 'calculation_type',
+    type: 'enum',
+    enum: CalculationType,
+    nullable: true
+  })
+  calculationType?: CalculationType | null
 
   @Column({
     name: 'calculation_status',
@@ -89,7 +98,8 @@ export class AdditionalCost {
     methodOfPayment: MethodOfPayment,
     billingType: BillingType,
     acquisitionType: AcquisitionType,
-    price: number,
+    price?: number | null,
+    calculationType?: CalculationType | null,
     calculationStatus?: ProductStateStatus | null,
     maxPieces?: number | null,
     enableUpload?: boolean
@@ -98,7 +108,8 @@ export class AdditionalCost {
     this.methodOfPayment = methodOfPayment
     this.billingType = billingType
     this.acquisitionType = acquisitionType
-    this.price = price
+    this.price = price ?? null
+    this.calculationType = calculationType ?? null
     this.calculationStatus = calculationStatus ?? null
     this.maxPieces = maxPieces ?? null
     this.enableUpload = enableUpload ?? false

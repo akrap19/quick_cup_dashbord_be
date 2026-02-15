@@ -13,12 +13,18 @@ export enum BillingType {
   ONE_TIME = 'one_time'
 }
 
+export enum CalculationType {
+  OVERALL = 'overall',
+  BY_PRODUCT = 'by_product'
+}
+
 export interface ICreateAdditionalCost extends IServiceMethod {
   name: string
   methodOfPayment: MethodOfPayment
   billingType: BillingType
   acquisitionType: AcquisitionType
-  price: number
+  price?: number | null
+  calculationType?: CalculationType | null
   calculationStatus?: ProductStateStatus | null
   maxPieces?: number | null
   enableUpload?: boolean
@@ -31,6 +37,7 @@ export interface IUpdateAdditionalCost extends IServiceMethod {
   billingType?: BillingType
   acquisitionType?: AcquisitionType
   price?: number
+  calculationType?: CalculationType | null
   calculationStatus?: ProductStateStatus | null
   maxPieces?: number | null
   enableUpload?: boolean

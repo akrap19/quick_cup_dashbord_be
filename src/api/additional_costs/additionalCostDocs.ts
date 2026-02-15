@@ -200,7 +200,12 @@ const definitions = {
         type: 'string',
         enum: ['buy', 'rent']
       },
-      price: { type: 'number' },
+      price: { type: 'number', nullable: true },
+      calculationType: {
+        type: 'string',
+        enum: ['overall', 'by_product'],
+        nullable: true
+      },
       calculationStatus: {
         type: 'string',
         enum: [
@@ -224,7 +229,6 @@ const definitions = {
       'methodOfPayment',
       'billingType',
       'acquisitionType',
-      'price',
       'createdAt',
       'updatedAt'
     ]
@@ -245,7 +249,12 @@ const definitions = {
         type: 'string',
         enum: ['buy', 'rent']
       },
-      price: { type: 'number', minimum: 0 },
+      price: { type: 'number', minimum: 0, nullable: true },
+      calculationType: {
+        type: 'string',
+        enum: ['overall', 'by_product'],
+        nullable: true
+      },
       calculationStatus: {
         type: 'string',
         enum: [
@@ -265,8 +274,7 @@ const definitions = {
       'name',
       'methodOfPayment',
       'billingType',
-      'acquisitionType',
-      'price'
+      'acquisitionType'
     ]
   },
   update_additional_cost_body: {
@@ -285,7 +293,12 @@ const definitions = {
         type: 'string',
         enum: ['buy', 'rent']
       },
-      price: { type: 'number', minimum: 0 },
+      price: { type: 'number', minimum: 0, nullable: true },
+      calculationType: {
+        type: 'string',
+        enum: ['overall', 'by_product'],
+        nullable: true
+      },
       calculationStatus: {
         type: 'string',
         enum: [
