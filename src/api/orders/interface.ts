@@ -46,6 +46,7 @@ export interface ICreateOrder extends IServiceMethod {
   contactPerson?: string | null
   contactPersonContact?: string | null
   discount?: number | null
+  serviceLocationId?: string | null
   products?: IOrderProductInput[]
   services?: IOrderServiceInput[]
   additionalCosts?: IOrderAdditionalCostInput[]
@@ -65,6 +66,7 @@ export interface IUpdateOrder extends IServiceMethod {
   contactPerson?: string | null
   contactPersonContact?: string | null
   discount?: number | null
+  serviceLocationId?: string | null
   products?: IOrderProductInput[]
   services?: IOrderServiceInput[]
   additionalCosts?: IOrderAdditionalCostInput[]

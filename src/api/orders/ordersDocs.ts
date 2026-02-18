@@ -63,7 +63,7 @@ const paths = {
       responses: {
         '200': {
           description:
-            'Successfully retrieved order. The response includes serviceLocation information for each service, showing which service location (if any) the service is allocated to. Each service also includes quantityByProduct array showing the breakdown of product quantities within the service.',
+            'Successfully retrieved order. The response includes a serviceLocation object at the order level (if a dedicated service location was assigned to the order), and serviceLocation information for each service, showing which service location (if any) the service is allocated to. Each service also includes quantityByProduct array showing the breakdown of product quantities within the service.',
           content: {
             'application/json': {
               schema: {
@@ -174,6 +174,7 @@ const definitions = {
       contactPerson: 'John Doe',
       contactPersonContact: 'john@example.com',
       discount: 10.5,
+      serviceLocationId: 'uuid-here', // Optional: dedicated service location for the order
       products: [
         {
           productId: 'uuid-here',
@@ -224,7 +225,7 @@ const definitions = {
       ]
     },
     description:
-      'Order number is automatically generated in format: qc-ddmmyy0000001. Each service in the services array can optionally include a serviceLocationId to allocate the service to a specific service location, and quantityByProduct array to specify how many of each product are included in the service. For additionalCosts, quantityByProduct is optional and used when the additionalCost.methodOfPayment is "after" OR enableUpload is true. When enableUpload is true, files can be uploaded for products in the products array - either by providing fileId (for pre-uploaded files) or by uploading files directly via multipart/form-data using the naming pattern: products[0].file, products[1].file, etc.'
+      'Order number is automatically generated in format: qc-ddmmyy0000001. The serviceLocationId field (optional) allows you to assign a dedicated service location to the order, which must be one of the service locations added to the services. Each service in the services array can optionally include a serviceLocationId to allocate the service to a specific service location, and quantityByProduct array to specify how many of each product are included in the service. For additionalCosts, quantityByProduct is optional and used when the additionalCost.methodOfPayment is "after" OR enableUpload is true. When enableUpload is true, files can be uploaded for products in the products array - either by providing fileId (for pre-uploaded files) or by uploading files directly via multipart/form-data using the naming pattern: products[0].file, products[1].file, etc.'
   },
   update_order_body: {
     example: {
@@ -235,6 +236,7 @@ const definitions = {
       place: 'Uptown',
       street: 'Oak Avenue',
       discount: 15.0,
+      serviceLocationId: 'uuid-here', // Optional: dedicated service location for the order
       products: [
         {
           productId: 'uuid-here',
@@ -285,7 +287,7 @@ const definitions = {
       ]
     },
     description:
-      'Each service in the services array can optionally include a serviceLocationId to allocate the service to a specific service location, and quantityByProduct array to specify how many of each product are included in the service. For additionalCosts, quantityByProduct is optional and used when the additionalCost.methodOfPayment is "after" OR enableUpload is true. When enableUpload is true, files can be uploaded for products in the products array - either by providing fileId (for pre-uploaded files) or by uploading files directly via multipart/form-data using the naming pattern: products[0].file, products[1].file, etc.'
+      'The serviceLocationId field (optional) allows you to assign or update a dedicated service location for the order, which must be one of the service locations added to the services. Each service in the services array can optionally include a serviceLocationId to allocate the service to a specific service location, and quantityByProduct array to specify how many of each product are included in the service. For additionalCosts, quantityByProduct is optional and used when the additionalCost.methodOfPayment is "after" OR enableUpload is true. When enableUpload is true, files can be uploaded for products in the products array - either by providing fileId (for pre-uploaded files) or by uploading files directly via multipart/form-data using the naming pattern: products[0].file, products[1].file, etc.'
   },
   update_order_status_body: {
     example: {
@@ -314,6 +316,7 @@ const definitions = {
             contactPerson: 'John Doe',
             contactPersonContact: 'john@example.com',
             discount: 10.5,
+            serviceLocationId: 'aa069d61-3f62-4f3f-b8c4-10f3f26b4e51',
             placedAt: '2024-01-01T10:00:00.000Z',
             createdAt: '2024-01-01T10:00:00.000Z',
             updatedAt: '2024-01-01T10:00:00.000Z',
@@ -334,6 +337,17 @@ const definitions = {
               name: 'Summer Event 2024',
               startDate: '2024-06-01T00:00:00.000Z',
               endDate: '2024-06-30T23:59:59.000Z'
+            },
+            serviceLocation: {
+              id: 'aa069d61-3f62-4f3f-b8c4-10f3f26b4e51',
+              city: 'New York',
+              address: '123 Service St',
+              phone: '+1234567890',
+              email: 'service@example.com',
+              userId: 'bb069d61-3f62-4f3f-b8c4-10f3f26b4e51',
+              serviceId: 'cc069d61-3f62-4f3f-b8c4-10f3f26b4e51',
+              createdAt: '2024-01-01T10:00:00.000Z',
+              updatedAt: '2024-01-01T10:00:00.000Z'
             },
             products: [
               {
@@ -433,6 +447,7 @@ const definitions = {
         contactPerson: 'John Doe',
         contactPersonContact: 'john@example.com',
         discount: 10.5,
+        serviceLocationId: 'aa069d61-3f62-4f3f-b8c4-10f3f26b4e51',
         placedAt: '2024-01-01T10:00:00.000Z',
         createdAt: '2024-01-01T10:00:00.000Z',
         updatedAt: '2024-01-01T10:00:00.000Z',
@@ -454,6 +469,17 @@ const definitions = {
           name: 'Summer Event 2024',
           startDate: '2024-06-01T00:00:00.000Z',
           endDate: '2024-06-30T23:59:59.000Z'
+        },
+        serviceLocation: {
+          id: 'aa069d61-3f62-4f3f-b8c4-10f3f26b4e51',
+          city: 'New York',
+          address: '123 Service St',
+          phone: '+1234567890',
+          email: 'service@example.com',
+          userId: 'bb069d61-3f62-4f3f-b8c4-10f3f26b4e51',
+          serviceId: 'cc069d61-3f62-4f3f-b8c4-10f3f26b4e51',
+          createdAt: '2024-01-01T10:00:00.000Z',
+          updatedAt: '2024-01-01T10:00:00.000Z'
         },
         products: [
           {
@@ -563,6 +589,7 @@ const definitions = {
       contactPerson: { type: 'string' },
       contactPersonContact: { type: 'string' },
       discount: { type: 'number' },
+      serviceLocationId: { type: 'string' },
       products: { type: 'array' },
       services: { type: 'array' },
       additionalCosts: { type: 'array' },
@@ -597,6 +624,7 @@ const definitions = {
       contactPerson: { type: 'string' },
       contactPersonContact: { type: 'string' },
       discount: { type: 'number' },
+      serviceLocationId: { type: 'string' },
       products: { type: 'array' },
       services: { type: 'array' },
       additionalCosts: { type: 'array' },

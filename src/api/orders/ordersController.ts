@@ -92,6 +92,7 @@ export class OrdersController {
       contactPerson,
       contactPersonContact,
       discount,
+      serviceLocationId,
       products,
       services,
       additionalCosts
@@ -135,6 +136,7 @@ export class OrdersController {
       contactPerson,
       contactPersonContact,
       discount: numericDiscount,
+      serviceLocationId,
       products,
       services,
       additionalCosts
@@ -163,6 +165,7 @@ export class OrdersController {
       contactPerson,
       contactPersonContact,
       discount,
+      serviceLocationId,
       products,
       services,
       additionalCosts
@@ -198,6 +201,7 @@ export class OrdersController {
         typeof contactPerson === 'undefined' &&
         typeof contactPersonContact === 'undefined' &&
         typeof discount === 'undefined' &&
+        typeof serviceLocationId === 'undefined' &&
         typeof products === 'undefined' &&
         typeof services === 'undefined' &&
         typeof additionalCosts === 'undefined')
@@ -227,6 +231,7 @@ export class OrdersController {
       contactPerson,
       contactPersonContact,
       discount: numericDiscount,
+      serviceLocationId,
       products,
       services,
       additionalCosts
@@ -238,7 +243,6 @@ export class OrdersController {
 
     return next({ data: order, code })
   }
-
 
   deleteOrder = async (req: Request, res: Response, next: NextFunction) => {
     const input = res.locals.input ?? {}

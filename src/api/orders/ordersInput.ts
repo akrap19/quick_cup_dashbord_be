@@ -53,6 +53,7 @@ const baseOrderBody = {
   contactPerson: Joi.string().max(128).allow('', null).optional(),
   contactPersonContact: Joi.string().max(255).allow('', null).optional(),
   discount: Joi.number().precision(2).positive().allow(null).optional(),
+  serviceLocationId: uuidSchema.allow(null).optional(),
   products: Joi.array().items(orderProductSchema).optional(),
   services: Joi.array().items(orderServiceSchema).optional(),
   additionalCosts: Joi.array().items(orderAdditionalCostSchema).optional()
@@ -116,6 +117,11 @@ export const createOrderSchema = (req: Request) => {
       contactPerson: req.body.contactPerson ?? null,
       contactPersonContact: req.body.contactPersonContact ?? null,
       discount: req.body.discount ?? null,
+      serviceLocationId:
+        req.body.serviceLocationId === '' ||
+        req.body.serviceLocationId === undefined
+          ? null
+          : req.body.serviceLocationId,
       products: req.body.products ?? [],
       services: req.body.services ?? [],
       additionalCosts: req.body.additionalCosts ?? []
@@ -152,6 +158,11 @@ export const updateOrderSchema = (req: Request) => {
       contactPerson: req.body.contactPerson ?? null,
       contactPersonContact: req.body.contactPersonContact ?? null,
       discount: req.body.discount ?? null,
+      serviceLocationId:
+        req.body.serviceLocationId === '' ||
+        req.body.serviceLocationId === undefined
+          ? null
+          : req.body.serviceLocationId,
       products: req.body.products,
       services: req.body.services,
       additionalCosts: req.body.additionalCosts

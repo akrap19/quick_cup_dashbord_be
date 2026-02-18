@@ -148,6 +148,11 @@ export class OrdersService implements IOrderService {
       const [orders, count] = await query
         .leftJoinAndSelect('order.customer', 'customer')
         .leftJoinAndSelect('order.event', 'event')
+        .leftJoinAndSelect('order.serviceLocation', 'orderServiceLocation')
+        .leftJoinAndSelect(
+          'orderServiceLocation.service',
+          'orderServiceLocationService'
+        )
         .leftJoinAndSelect('order.products', 'products')
         .leftJoinAndSelect('order.services', 'services')
         .leftJoinAndSelect('services.serviceLocation', 'serviceLocation')
@@ -235,9 +240,21 @@ export class OrdersService implements IOrderService {
             )
           }
 
+          // Transform serviceLocation to include service name
+          let transformedServiceLocation = null
+          if (order.serviceLocation) {
+            transformedServiceLocation = {
+              ...order.serviceLocation,
+              serviceName: order.serviceLocation.service?.name || null
+            }
+            // Remove the full service object, keep only the name
+            delete (transformedServiceLocation as any).service
+          }
+
           const statusDesc = getStatusDescription(order.status)
           return {
             ...order,
+            serviceLocation: transformedServiceLocation, // Include serviceLocation with service name
             statusInfo: statusDesc
               ? {
                   title: statusDesc.title,
@@ -289,6 +306,11 @@ export class OrdersService implements IOrderService {
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.customer', 'customer')
         .leftJoinAndSelect('order.event', 'event')
+        .leftJoinAndSelect('order.serviceLocation', 'orderServiceLocation')
+        .leftJoinAndSelect(
+          'orderServiceLocation.service',
+          'orderServiceLocationService'
+        )
         .leftJoinAndSelect('order.products', 'products')
         .leftJoinAndSelect('products.product', 'product')
         .leftJoinAndSelect('product.images', 'productImages')
@@ -406,10 +428,22 @@ export class OrdersService implements IOrderService {
         )
       }
 
+      // Transform serviceLocation to include service name
+      let transformedServiceLocation = null
+      if (order.serviceLocation) {
+        transformedServiceLocation = {
+          ...order.serviceLocation,
+          serviceName: order.serviceLocation.service?.name || null
+        }
+        // Remove the full service object, keep only the name
+        delete (transformedServiceLocation as any).service
+      }
+
       // Enrich order with status description
       const statusDesc = getStatusDescription(order.status)
       const enrichedOrder = {
         ...order,
+        serviceLocation: transformedServiceLocation, // Include serviceLocation with service name
         statusInfo: statusDesc
           ? {
               title: statusDesc.title,
@@ -445,6 +479,7 @@ export class OrdersService implements IOrderService {
     contactPerson,
     contactPersonContact,
     discount,
+    serviceLocationId,
     products,
     services,
     additionalCosts,
@@ -479,10 +514,21 @@ export class OrdersService implements IOrderService {
         street: street ?? null,
         contactPerson: contactPerson ?? null,
         contactPersonContact: contactPersonContact ?? null,
-        discount: discount ?? null
+        discount: discount ?? null,
+        serviceLocationId: serviceLocationId ?? null
       })
 
       const savedOrder = await orderRepository.save(order)
+
+      // Explicitly update serviceLocationId if provided to ensure it's saved
+      if (serviceLocationId !== undefined && serviceLocationId !== null) {
+        await orderRepository
+          .createQueryBuilder()
+          .update(Order)
+          .set({ serviceLocationId })
+          .where('id = :id', { id: savedOrder.id })
+          .execute()
+      }
 
       // Create order products
       if (products && products.length > 0) {
@@ -634,6 +680,11 @@ export class OrdersService implements IOrderService {
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.customer', 'customer')
         .leftJoinAndSelect('order.event', 'event')
+        .leftJoinAndSelect('order.serviceLocation', 'orderServiceLocation')
+        .leftJoinAndSelect(
+          'orderServiceLocation.service',
+          'orderServiceLocationService'
+        )
         .leftJoinAndSelect('order.products', 'products')
         .leftJoinAndSelect('products.product', 'product')
         .leftJoinAndSelect('product.images', 'productImages')
@@ -713,10 +764,22 @@ export class OrdersService implements IOrderService {
         )
       }
 
+      // Transform serviceLocation to include service name
+      let transformedServiceLocation = null
+      if (orderWithRelations.serviceLocation) {
+        transformedServiceLocation = {
+          ...orderWithRelations.serviceLocation,
+          serviceName: orderWithRelations.serviceLocation.service?.name || null
+        }
+        // Remove the full service object, keep only the name
+        delete (transformedServiceLocation as any).service
+      }
+
       // Enrich order with status description
       const statusDesc = getStatusDescription(orderWithRelations.status)
       const enrichedOrder = {
         ...orderWithRelations,
+        serviceLocation: transformedServiceLocation, // Include serviceLocation with service name
         statusInfo: statusDesc
           ? {
               title: statusDesc.title,
@@ -757,6 +820,7 @@ export class OrdersService implements IOrderService {
     contactPerson,
     contactPersonContact,
     discount,
+    serviceLocationId,
     products,
     services,
     additionalCosts,
@@ -834,6 +898,9 @@ export class OrdersService implements IOrderService {
       }
       if (typeof discount !== 'undefined') {
         updateData.discount = discount ?? null
+      }
+      if (typeof serviceLocationId !== 'undefined') {
+        updateData.serviceLocationId = serviceLocationId ?? null
       }
 
       if (Object.keys(updateData).length > 0) {
@@ -1241,8 +1308,13 @@ export class OrdersService implements IOrderService {
                 }
               }
             } else {
-              // For RENT orders, use the existing processProductForOrder logic
+              // For RENT orders, use the order's serviceLocationId to take from available products
+              // and put them to IN_USE status with USER location, holder is client from order
               const processedProducts = new Map<string, number>()
+
+              // Use the order's serviceLocationId for all product allocations
+              const orderServiceLocationId =
+                orderForProcessing.serviceLocationId ?? null
 
               // Process products from order services
               if (
@@ -1251,7 +1323,6 @@ export class OrdersService implements IOrderService {
               ) {
                 for (const orderService of orderForProcessing.services) {
                   if (
-                    !orderService.serviceLocationId ||
                     !orderService.products ||
                     orderService.products.length === 0
                   ) {
@@ -1259,7 +1330,9 @@ export class OrdersService implements IOrderService {
                   }
 
                   for (const orderServiceProduct of orderService.products) {
-                    const key = `${orderServiceProduct.productId}-${orderService.serviceLocationId}`
+                    const key = `${orderServiceProduct.productId}-${
+                      orderServiceLocationId || 'none'
+                    }`
                     const alreadyProcessed = processedProducts.get(key) || 0
                     const quantityToProcess =
                       orderServiceProduct.quantity - alreadyProcessed
@@ -1268,7 +1341,7 @@ export class OrdersService implements IOrderService {
                       await this.processProductForOrder(
                         orderServiceProduct.productId,
                         quantityToProcess,
-                        orderService.serviceLocationId,
+                        orderServiceLocationId,
                         orderForProcessing.customerId!,
                         targetStatus,
                         manager
@@ -1278,6 +1351,36 @@ export class OrdersService implements IOrderService {
                         (processedProducts.get(key) || 0) + quantityToProcess
                       )
                     }
+                  }
+                }
+              }
+
+              // Process direct order products for RENT orders
+              if (
+                orderForProcessing.products &&
+                orderForProcessing.products.length > 0
+              ) {
+                for (const orderProduct of orderForProcessing.products) {
+                  const key = `${orderProduct.productId}-${
+                    orderServiceLocationId || 'none'
+                  }`
+                  const alreadyProcessed = processedProducts.get(key) || 0
+                  const quantityToProcess =
+                    orderProduct.quantity - alreadyProcessed
+
+                  if (quantityToProcess > 0) {
+                    await this.processProductForOrder(
+                      orderProduct.productId,
+                      quantityToProcess,
+                      orderServiceLocationId,
+                      orderForProcessing.customerId!,
+                      targetStatus,
+                      manager
+                    )
+                    processedProducts.set(
+                      key,
+                      (processedProducts.get(key) || 0) + quantityToProcess
+                    )
                   }
                 }
               }
@@ -1300,20 +1403,9 @@ export class OrdersService implements IOrderService {
                   const calculationStatus =
                     orderAdditionalCost.additionalCost.calculationStatus
 
-                  // Find the service location from services in the order
-                  let serviceLocationId: string | null = null
-                  if (
-                    orderForProcessing.services &&
-                    orderForProcessing.services.length > 0 &&
-                    orderForProcessing.services[0].serviceLocationId
-                  ) {
-                    serviceLocationId =
-                      orderForProcessing.services[0].serviceLocationId
-                  }
-
                   for (const additionalCostProduct of orderAdditionalCost.products) {
                     const key = `${additionalCostProduct.productId}-${
-                      serviceLocationId || 'none'
+                      orderServiceLocationId || 'none'
                     }-additional-${orderAdditionalCost.id}`
                     const alreadyProcessed = processedProducts.get(key) || 0
                     const quantityToProcess =
@@ -1323,7 +1415,7 @@ export class OrdersService implements IOrderService {
                       await this.processProductForOrder(
                         additionalCostProduct.productId,
                         quantityToProcess,
-                        serviceLocationId,
+                        orderServiceLocationId,
                         orderForProcessing.customerId!,
                         calculationStatus,
                         manager
@@ -1840,6 +1932,46 @@ export class OrdersService implements IOrderService {
           orderWithAdditionalCosts.acquisitionType === AcquisitionType.BUY
         const targetStatus = ProductStateStatus.IN_USE
 
+        // Helper function to deduct from available products for BUY orders
+        const deductFromAvailableProducts = async (
+          originalProductId: string,
+          quantityToDeduct: number
+        ): Promise<void> => {
+          // Find available products in any service location
+          const availableProductStates = await productStateRepository.find({
+            where: {
+              productId: originalProductId,
+              status: ProductStateStatus.AVAILABLE,
+              location: ProductStateLocation.SERVICE
+            },
+            order: { createdAt: 'ASC' } // Use oldest first
+          })
+
+          let remainingToDeduct = quantityToDeduct
+
+          for (const productState of availableProductStates) {
+            if (remainingToDeduct <= 0) {
+              break
+            }
+
+            const quantityToDeductFromState = Math.min(
+              productState.quantity,
+              remainingToDeduct
+            )
+
+            if (quantityToDeductFromState === productState.quantity) {
+              // Remove entire state
+              await productStateRepository.remove(productState)
+            } else {
+              // Reduce quantity
+              productState.quantity -= quantityToDeductFromState
+              await productStateRepository.save(productState)
+            }
+
+            remainingToDeduct -= quantityToDeductFromState
+          }
+        }
+
         // For BUY orders, copy products and create a mapping from original to copied product IDs
         const productIdMap = new Map<string, string>()
         if (isBuyOrder) {
@@ -1927,6 +2059,12 @@ export class OrdersService implements IOrderService {
                   orderServiceProduct.quantity - alreadyProcessed
 
                 if (quantityToProcess > 0) {
+                  // Deduct from available products (use original product ID)
+                  await deductFromAvailableProducts(
+                    orderServiceProduct.productId,
+                    quantityToProcess
+                  )
+
                   // Always create a new product state for each purchase
                   const newProductState = productStateRepository.create({
                     status: ProductStateStatus.IN_USE,
@@ -1964,6 +2102,12 @@ export class OrdersService implements IOrderService {
               const quantityToProcess = orderProduct.quantity - alreadyProcessed
 
               if (quantityToProcess > 0) {
+                // Deduct from available products (use original product ID)
+                await deductFromAvailableProducts(
+                  orderProduct.productId,
+                  quantityToProcess
+                )
+
                 // Check if product state already exists for this product and user
                 const existingState = await productStateRepository.findOne({
                   where: {
@@ -2000,8 +2144,13 @@ export class OrdersService implements IOrderService {
             }
           }
         } else {
-          // For RENT orders, use the existing processProductForOrder logic
+          // For RENT orders, use the order's serviceLocationId to take from available products
+          // and put them to IN_USE status with USER location, holder is client from order
           const processedProducts = new Map<string, number>()
+
+          // Use the order's serviceLocationId for all product allocations
+          const orderServiceLocationId =
+            orderWithAdditionalCosts.serviceLocationId ?? null
 
           // Process products from order services
           if (
@@ -2010,7 +2159,6 @@ export class OrdersService implements IOrderService {
           ) {
             for (const orderService of orderWithAdditionalCosts.services) {
               if (
-                !orderService.serviceLocationId ||
                 !orderService.products ||
                 orderService.products.length === 0
               ) {
@@ -2018,7 +2166,9 @@ export class OrdersService implements IOrderService {
               }
 
               for (const orderServiceProduct of orderService.products) {
-                const key = `${orderServiceProduct.productId}-${orderService.serviceLocationId}`
+                const key = `${orderServiceProduct.productId}-${
+                  orderServiceLocationId || 'none'
+                }`
                 const alreadyProcessed = processedProducts.get(key) || 0
                 const quantityToProcess =
                   orderServiceProduct.quantity - alreadyProcessed
@@ -2027,7 +2177,7 @@ export class OrdersService implements IOrderService {
                   await this.processProductForOrder(
                     orderServiceProduct.productId,
                     quantityToProcess,
-                    orderService.serviceLocationId,
+                    orderServiceLocationId,
                     orderWithAdditionalCosts.customerId,
                     targetStatus,
                     manager
@@ -2037,6 +2187,35 @@ export class OrdersService implements IOrderService {
                     (processedProducts.get(key) || 0) + quantityToProcess
                   )
                 }
+              }
+            }
+          }
+
+          // Process direct order products for RENT orders
+          if (
+            orderWithAdditionalCosts.products &&
+            orderWithAdditionalCosts.products.length > 0
+          ) {
+            for (const orderProduct of orderWithAdditionalCosts.products) {
+              const key = `${orderProduct.productId}-${
+                orderServiceLocationId || 'none'
+              }`
+              const alreadyProcessed = processedProducts.get(key) || 0
+              const quantityToProcess = orderProduct.quantity - alreadyProcessed
+
+              if (quantityToProcess > 0) {
+                await this.processProductForOrder(
+                  orderProduct.productId,
+                  quantityToProcess,
+                  orderServiceLocationId,
+                  orderWithAdditionalCosts.customerId,
+                  targetStatus,
+                  manager
+                )
+                processedProducts.set(
+                  key,
+                  (processedProducts.get(key) || 0) + quantityToProcess
+                )
               }
             }
           }
@@ -2059,20 +2238,9 @@ export class OrdersService implements IOrderService {
               const calculationStatus =
                 orderAdditionalCost.additionalCost.calculationStatus
 
-              // Find the service location from services in the order
-              let serviceLocationId: string | null = null
-              if (
-                orderWithAdditionalCosts.services &&
-                orderWithAdditionalCosts.services.length > 0 &&
-                orderWithAdditionalCosts.services[0].serviceLocationId
-              ) {
-                serviceLocationId =
-                  orderWithAdditionalCosts.services[0].serviceLocationId
-              }
-
               for (const additionalCostProduct of orderAdditionalCost.products) {
                 const key = `${additionalCostProduct.productId}-${
-                  serviceLocationId || 'none'
+                  orderServiceLocationId || 'none'
                 }-additional-${orderAdditionalCost.id}`
                 const alreadyProcessed = processedProducts.get(key) || 0
                 const quantityToProcess =
@@ -2082,7 +2250,7 @@ export class OrdersService implements IOrderService {
                   await this.processProductForOrder(
                     additionalCostProduct.productId,
                     quantityToProcess,
-                    serviceLocationId,
+                    orderServiceLocationId,
                     orderWithAdditionalCosts.customerId,
                     calculationStatus,
                     manager
@@ -2117,6 +2285,12 @@ export class OrdersService implements IOrderService {
               orderAdditionalCost.additionalCost.calculationStatus
 
             for (const additionalCostProduct of orderAdditionalCost.products) {
+              // Deduct from available products (use original product ID)
+              await deductFromAvailableProducts(
+                additionalCostProduct.productId,
+                additionalCostProduct.quantity
+              )
+
               // Use copied product ID for BUY orders
               const productIdToUse =
                 productIdMap.get(additionalCostProduct.productId) ||
@@ -2432,6 +2606,267 @@ export class OrdersService implements IOrderService {
               state.serviceId = null
               state.serviceLocationId = null
               await productStateRepository.save(state)
+            }
+          }
+        }
+      }
+
+      // Handle product state updates when status changes to COMPLETED
+      // Return products from user back to order's service location with AVAILABLE status (for RENT orders only)
+      if (
+        status === OrderStatus.COMPLETED &&
+        previousStatus !== OrderStatus.COMPLETED &&
+        orderWithAdditionalCosts &&
+        orderWithAdditionalCosts.customerId &&
+        orderWithAdditionalCosts.acquisitionType === AcquisitionType.RENT &&
+        orderWithAdditionalCosts.serviceLocationId
+      ) {
+        // Collect all product IDs and quantities from this order
+        const orderProductMap = new Map<string, number>()
+
+        // Collect products from direct order products
+        if (
+          orderWithAdditionalCosts.products &&
+          orderWithAdditionalCosts.products.length > 0
+        ) {
+          for (const orderProduct of orderWithAdditionalCosts.products) {
+            const currentQuantity =
+              orderProductMap.get(orderProduct.productId) || 0
+            orderProductMap.set(
+              orderProduct.productId,
+              currentQuantity + orderProduct.quantity
+            )
+          }
+        }
+
+        // Collect products from order services
+        if (
+          orderWithAdditionalCosts.services &&
+          orderWithAdditionalCosts.services.length > 0
+        ) {
+          for (const orderService of orderWithAdditionalCosts.services) {
+            if (orderService.products && orderService.products.length > 0) {
+              for (const orderServiceProduct of orderService.products) {
+                const currentQuantity =
+                  orderProductMap.get(orderServiceProduct.productId) || 0
+                orderProductMap.set(
+                  orderServiceProduct.productId,
+                  currentQuantity + orderServiceProduct.quantity
+                )
+              }
+            }
+          }
+        }
+
+        // Find all product states that are IN_USE and belong to this order's customer
+        // Only for products that are in this order
+        if (orderProductMap.size > 0) {
+          const orderProductIds = Array.from(orderProductMap.keys())
+          const productStatesToReturn = await productStateRepository.find({
+            where: {
+              userId: orderWithAdditionalCosts.customerId,
+              location: ProductStateLocation.USER,
+              status: ProductStateStatus.IN_USE,
+              productId: In(orderProductIds)
+            },
+            relations: ['product'],
+            order: { createdAt: 'ASC' }
+          })
+
+          // Track quantities to return per product
+          const quantitiesToReturn = new Map<string, number>(
+            Array.from(orderProductMap.entries())
+          )
+
+          // Return products to the order's service location
+          for (const productState of productStatesToReturn) {
+            const remainingQuantity =
+              quantitiesToReturn.get(productState.productId) || 0
+
+            if (remainingQuantity <= 0) {
+              continue
+            }
+
+            const quantityToReturn = Math.min(
+              productState.quantity,
+              remainingQuantity
+            )
+
+            if (quantityToReturn === productState.quantity) {
+              // Return entire state
+              productState.status = ProductStateStatus.AVAILABLE
+              productState.location = ProductStateLocation.SERVICE
+              productState.serviceLocationId =
+                orderWithAdditionalCosts.serviceLocationId
+              productState.serviceId = null // Clear serviceId when location is SERVICE (holder is service location, not service)
+              productState.userId = null // Clear userId when location is SERVICE (holder is service location, not user)
+
+              await productStateRepository.save(productState)
+              quantitiesToReturn.set(
+                productState.productId,
+                remainingQuantity - quantityToReturn
+              )
+            } else {
+              // Split: reduce this state's quantity and create new state for returned quantity
+              productState.quantity -= quantityToReturn
+              await productStateRepository.save(productState)
+
+              // Create new state with AVAILABLE status for the returned quantity
+              const returnedState = productStateRepository.create({
+                status: ProductStateStatus.AVAILABLE,
+                location: ProductStateLocation.SERVICE,
+                quantity: quantityToReturn,
+                productId: productState.productId,
+                serviceLocationId: orderWithAdditionalCosts.serviceLocationId,
+                serviceId: null, // Clear serviceId when location is SERVICE (holder is service location, not service)
+                userId: null // Clear userId when location is SERVICE (holder is service location, not user)
+              })
+              await productStateRepository.save(returnedState)
+              quantitiesToReturn.set(
+                productState.productId,
+                remainingQuantity - quantityToReturn
+              )
+            }
+          }
+        }
+      }
+
+      // Handle product state updates when status changes to COMPLETED
+      // For BUY orders: Change status to AVAILABLE, location is USER unless service has serviceLocationId
+      if (
+        status === OrderStatus.COMPLETED &&
+        previousStatus !== OrderStatus.COMPLETED &&
+        orderWithAdditionalCosts &&
+        orderWithAdditionalCosts.customerId &&
+        orderWithAdditionalCosts.acquisitionType === AcquisitionType.BUY
+      ) {
+        // Find if any service has a serviceLocationId
+        let targetServiceLocationId: string | null = null
+        if (
+          orderWithAdditionalCosts.services &&
+          orderWithAdditionalCosts.services.length > 0
+        ) {
+          // Find the first service with a serviceLocationId
+          for (const orderService of orderWithAdditionalCosts.services) {
+            if (orderService.serviceLocationId) {
+              targetServiceLocationId = orderService.serviceLocationId
+              break
+            }
+          }
+        }
+
+        // Collect total quantity from order
+        let totalQuantity = 0
+
+        // Collect products from direct order products
+        if (
+          orderWithAdditionalCosts.products &&
+          orderWithAdditionalCosts.products.length > 0
+        ) {
+          for (const orderProduct of orderWithAdditionalCosts.products) {
+            totalQuantity += orderProduct.quantity
+          }
+        }
+
+        // Collect products from order services
+        if (
+          orderWithAdditionalCosts.services &&
+          orderWithAdditionalCosts.services.length > 0
+        ) {
+          for (const orderService of orderWithAdditionalCosts.services) {
+            if (orderService.products && orderService.products.length > 0) {
+              for (const orderServiceProduct of orderService.products) {
+                totalQuantity += orderServiceProduct.quantity
+              }
+            }
+          }
+        }
+
+        // Find all IN_USE product states for this customer
+        // For BUY orders, products are copied and ownedBy is set to customerId
+        // We need to find product states for products owned by this customer (newest first)
+        if (totalQuantity > 0) {
+          const productRepository = manager.getRepository(Product)
+
+          // First, find all products owned by this customer (the copied products)
+          const customerProducts = await productRepository.find({
+            where: {
+              ownedBy: orderWithAdditionalCosts.customerId
+            },
+            order: { createdAt: 'DESC' } // Newest first
+          })
+
+          const customerProductIds = customerProducts.map((p) => p.id)
+
+          if (customerProductIds.length > 0) {
+            // Find product states for these customer-owned products that are IN_USE
+            const productStatesToUpdate = await productStateRepository.find({
+              where: {
+                productId: In(customerProductIds),
+                userId: orderWithAdditionalCosts.customerId,
+                location: ProductStateLocation.USER,
+                status: ProductStateStatus.IN_USE
+              },
+              relations: ['product'],
+              order: { createdAt: 'DESC' } // Newest first - get the most recently created products
+            })
+
+            // Update products: change status to AVAILABLE
+            // If serviceLocationId exists, move to SERVICE location, otherwise keep USER location
+            let remainingQuantity = totalQuantity
+
+            for (const productState of productStatesToUpdate) {
+              if (remainingQuantity <= 0) {
+                break
+              }
+
+              const quantityToUpdate = Math.min(
+                productState.quantity,
+                remainingQuantity
+              )
+
+              if (quantityToUpdate === productState.quantity) {
+                // Update entire state
+                productState.status = ProductStateStatus.AVAILABLE
+
+                if (targetServiceLocationId) {
+                  // Move to service location
+                  productState.location = ProductStateLocation.SERVICE
+                  productState.serviceLocationId = targetServiceLocationId
+                  productState.serviceId = null
+                  productState.userId = null
+                } else {
+                  // Keep with user
+                  productState.location = ProductStateLocation.USER
+                  productState.userId = orderWithAdditionalCosts.customerId
+                  productState.serviceId = null
+                  productState.serviceLocationId = null
+                }
+
+                await productStateRepository.save(productState)
+                remainingQuantity -= quantityToUpdate
+              } else {
+                // Split: reduce this state's quantity and create new state
+                productState.quantity -= quantityToUpdate
+                await productStateRepository.save(productState)
+
+                // Create new state with AVAILABLE status
+                const newState = productStateRepository.create({
+                  status: ProductStateStatus.AVAILABLE,
+                  location: targetServiceLocationId
+                    ? ProductStateLocation.SERVICE
+                    : ProductStateLocation.USER,
+                  quantity: quantityToUpdate,
+                  productId: productState.productId,
+                  serviceLocationId: targetServiceLocationId,
+                  serviceId: null,
+                  userId: targetServiceLocationId
+                    ? null
+                    : orderWithAdditionalCosts.customerId
+                })
+                await productStateRepository.save(newState)
+                remainingQuantity -= quantityToUpdate
+              }
             }
           }
         }

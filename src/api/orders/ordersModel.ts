@@ -11,6 +11,7 @@ import {
 import { AcquisitionType } from '../products/interface'
 import { User } from '../user/userModel'
 import { EventModel } from '../events/eventsModel'
+import { ServiceLocationModel } from '../service_location/serviceLocationModel'
 import { OrderProduct } from './orderProductModel'
 import { OrderService } from './orderServiceModel'
 import { OrderAdditionalCost } from './orderAdditionalCostModel'
@@ -73,6 +74,16 @@ export class Order {
 
   @Column({ type: 'float', nullable: true })
   discount?: number | null
+
+  @Column({ type: 'uuid', name: 'service_location_id', nullable: true })
+  serviceLocationId?: string | null
+
+  @ManyToOne(() => ServiceLocationModel, {
+    onDelete: 'SET NULL',
+    nullable: true
+  })
+  @JoinColumn({ name: 'service_location_id' })
+  serviceLocation?: ServiceLocationModel | null
 
   @OneToMany(() => OrderProduct, (orderProduct) => orderProduct.order)
   products?: OrderProduct[]
