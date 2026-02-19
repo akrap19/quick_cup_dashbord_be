@@ -69,7 +69,7 @@ export class ProductsController {
     const input = res.locals.input ?? {}
     const { page, limit, search, userid } = input
 
-    // Use userid from query parameter if provided, otherwise use logged-in user's ID
+    console.log('Matijaaaa userid', input)
     let userId = userid
     if (!userId) {
       userId = req.user?.id

@@ -1,3 +1,5 @@
+import { AcquisitionType } from '../products/interface'
+
 export enum OrderStatus {
   PENDING = 'PENDING',
   ACCEPTED = 'ACCEPTED',
@@ -104,14 +106,45 @@ export const ORDER_STATUS_DESCRIPTIONS: Record<
 }
 
 /**
- * Get status description by status string
+ * Get status description by status string and acquisition type
  * Returns null if status doesn't match any enum value
+ * For rent orders, FINAL_PAYMENT_PENDING is not available
+ * PAYMENT_PENDING has different descriptions for rent vs buy
  */
 export function getStatusDescription(
-  status: string
+  status: string,
+  acquisitionType?: AcquisitionType
 ): OrderStatusDescription | null {
+  // For rent orders, FINAL_PAYMENT_PENDING is not a valid status
+  if (
+    status === OrderStatus.FINAL_PAYMENT_PENDING &&
+    acquisitionType === AcquisitionType.RENT
+  ) {
+    return null
+  }
+
   if (status in ORDER_STATUS_DESCRIPTIONS) {
-    return ORDER_STATUS_DESCRIPTIONS[status as OrderStatus]
+    const baseDescription = ORDER_STATUS_DESCRIPTIONS[status as OrderStatus]
+
+    // For PAYMENT_PENDING, return different descriptions based on acquisition type
+    if (status === OrderStatus.PAYMENT_PENDING) {
+      if (acquisitionType === AcquisitionType.RENT) {
+        return {
+          title: 'Invoice Sent - Awaiting Payment',
+          description:
+            'Your invoice has been sent. Once we receive the payment, we will begin preparing your order.',
+          customerMessage:
+            'Your invoice has been sent. Please complete the payment to proceed with your order preparation. Once payment is received, we will begin preparing your order.',
+          adminMessage:
+            'Payment invoice sent to customer. Awaiting payment for order.'
+        }
+      } else {
+        // For buy orders, use the original description
+        return baseDescription
+      }
+    }
+
+    return baseDescription
   }
   return null
 }

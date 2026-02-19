@@ -251,7 +251,10 @@ export class OrdersService implements IOrderService {
             delete (transformedServiceLocation as any).service
           }
 
-          const statusDesc = getStatusDescription(order.status)
+          const statusDesc = getStatusDescription(
+            order.status,
+            order.acquisitionType
+          )
           return {
             ...order,
             serviceLocation: transformedServiceLocation, // Include serviceLocation with service name
@@ -440,7 +443,10 @@ export class OrdersService implements IOrderService {
       }
 
       // Enrich order with status description
-      const statusDesc = getStatusDescription(order.status)
+      const statusDesc = getStatusDescription(
+        order.status,
+        order.acquisitionType
+      )
       const enrichedOrder = {
         ...order,
         serviceLocation: transformedServiceLocation, // Include serviceLocation with service name
@@ -776,7 +782,10 @@ export class OrdersService implements IOrderService {
       }
 
       // Enrich order with status description
-      const statusDesc = getStatusDescription(orderWithRelations.status)
+      const statusDesc = getStatusDescription(
+        orderWithRelations.status,
+        orderWithRelations.acquisitionType
+      )
       const enrichedOrder = {
         ...orderWithRelations,
         serviceLocation: transformedServiceLocation, // Include serviceLocation with service name
@@ -857,6 +866,17 @@ export class OrdersService implements IOrderService {
 
       if (!existingOrder) {
         return { code: ResponseCode.NOT_FOUND }
+      }
+
+      // Validate: FINAL_PAYMENT_PENDING is not allowed for rent orders
+      if (
+        typeof status !== 'undefined' &&
+        status === OrderStatus.FINAL_PAYMENT_PENDING &&
+        (existingOrder.acquisitionType === AcquisitionType.RENT ||
+          (typeof acquisitionType !== 'undefined' &&
+            acquisitionType === AcquisitionType.RENT))
+      ) {
+        return { code: ResponseCode.INVALID_INPUT }
       }
 
       const previousStatus = existingOrder.status
@@ -1890,6 +1910,14 @@ export class OrdersService implements IOrderService {
 
       if (!existingOrder) {
         return { code: ResponseCode.NOT_FOUND }
+      }
+
+      // Validate: FINAL_PAYMENT_PENDING is not allowed for rent orders
+      if (
+        status === OrderStatus.FINAL_PAYMENT_PENDING &&
+        existingOrder.acquisitionType === AcquisitionType.RENT
+      ) {
+        return { code: ResponseCode.INVALID_INPUT }
       }
 
       const previousStatus = existingOrder.status
