@@ -1,0 +1,12 @@
+node_modules
+build
+.git
+.gitignore
+.env
+.env.*
+!.env.template
+keys
+*.md
+.DS_Store
+Dockerfile
+.dockerignore
