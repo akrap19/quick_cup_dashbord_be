@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && mkdir -p build/services/email/logo && cp src/services/email/logo/QuickCup_logo.png build/services/email/logo/QuickCup_logo.png",
     "start": "node -r dotenv/config build/server.js",
     "dev": "ts-node-dev --respawn -r dotenv/config src/server.ts",
     "migration:generate": "ts-node-dev ./node_modules/.bin/typeorm migration:generate -d ./src/services/typeorm/index.ts",
