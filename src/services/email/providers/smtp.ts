@@ -9,11 +9,15 @@ export class SmtpProvider {
 
   constructor() {
     const hasAuth = Boolean(config.SMTP_USER && config.SMTP_PASS)
+    const ehloName =
+      config.SMTP_EHLO_NAME ||
+      (config.SMTP_HOST?.includes('gmail.com') ? 'quickcup.eu' : undefined)
 
     this.transporter = nodemailer.createTransport({
       host: config.SMTP_HOST,
       port: config.SMTP_PORT || 587,
       secure: config.SMTP_SECURE || false,
+      ...(ehloName ? { name: ehloName } : {}),
       ...(hasAuth
         ? { auth: { user: config.SMTP_USER!, pass: config.SMTP_PASS! } }
         : {}),

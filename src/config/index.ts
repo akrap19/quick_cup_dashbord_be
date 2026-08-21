@@ -39,6 +39,7 @@ interface ENV {
   SMTP_PASS?: string
   SMTP_SECURE?: boolean
   SMTP_TLS_REJECT_UNAUTHORIZED?: boolean
+  SMTP_EHLO_NAME?: string
   SFTP_HOST?: string
   SFTP_PORT?: number
   SFTP_USERNAME?: string
@@ -125,6 +126,7 @@ const getConfig = (): ENV => {
     SMTP_TLS_REJECT_UNAUTHORIZED: environmentBoolean(
       process.env.SMTP_TLS_REJECT_UNAUTHORIZED
     ),
+    SMTP_EHLO_NAME: process.env.SMTP_EHLO_NAME,
     GOOGLE_PLACES_API_KEY: process.env.GOOGLE_PLACES_API_KEY,
     GOOGLE_TRANSLATE_API_KEY: process.env.GOOGLE_TRANSLATE_API_KEY,
     GOOGLE_SERVICE_ACCOUNT_KEY_LOCATION:
