@@ -8,14 +8,15 @@ export class SmtpProvider {
   private transporter: nodemailer.Transporter
 
   constructor() {
+    const hasAuth = Boolean(config.SMTP_USER && config.SMTP_PASS)
+
     this.transporter = nodemailer.createTransport({
       host: config.SMTP_HOST,
       port: config.SMTP_PORT || 587,
       secure: config.SMTP_SECURE || false,
-      auth: {
-        user: config.SMTP_USER,
-        pass: config.SMTP_PASS
-      },
+      ...(hasAuth
+        ? { auth: { user: config.SMTP_USER!, pass: config.SMTP_PASS! } }
+        : {}),
       tls: {
         rejectUnauthorized: config.SMTP_TLS_REJECT_UNAUTHORIZED !== false
       }
